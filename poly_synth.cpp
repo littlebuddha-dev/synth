@@ -7,6 +7,11 @@
 #include <cmath>
 #include <iostream>
 
+#ifndef M_PI_2
+#define M_PI_2 (1.57079632679489661923) // pi/2
+#endif
+
+
 PolySynth::PolySynth(int sr, int maxNumVoices)
     : sampleRate(sr), maxVoices(maxNumVoices), lfo(sr), currentNoteTimestamp(0),
       modulationWheelValue(0.0f), wheelModSource(WheelModSource::LFO),
@@ -15,7 +20,8 @@ PolySynth::PolySynth(int sr, int maxNumVoices)
       wheelModToFilterAmount(0.0f),
       wheelModNoiseGenerator(std::random_device{}()),
       wheelModNoiseDistribution(-1.0f, 1.0f), unisonEnabled(false),
-      unisonDetuneCents(7.0f), lastUnisonNote(-1), lastUnisonVelocity(0.0f),
+      unisonDetuneCents(7.0f), unisonStereoSpread_(0.7f), 
+      lastUnisonNote(-1), lastUnisonVelocity(0.0f),
       glideEnabled(false), glideTimeSetting(0.05f),
       masterTuneCents(0.0f), 
       analogPitchDriftDepth_(0.0f), 
@@ -24,7 +30,7 @@ PolySynth::PolySynth(int sr, int maxNumVoices)
       pitchBendRangeSemitones_(2.0f) // Default pitch bend range +/- 2 semitones
 {
   for (int i = 0; i < maxVoices; ++i) {
-    voices.emplace_back(Voice(sampleRate, 16)); 
+    voices.emplace_back(Voice(sampleRate, 16)); // Default 16 harmonics for additive
   }
   for (int i = 0; i < static_cast<int>(LfoDestination::NumDestinations); ++i) {
     lfoModAmounts[i] = 0.0f;
@@ -44,51 +50,56 @@ void PolySynth::noteOn(int midiNote, float velocity) {
   if (unisonEnabled) {
     lastUnisonNote = midiNote;
     lastUnisonVelocity = velocity;
-
     
-    int numActiveVoices = voices.size();
+    int numUnisonVoicesToUse = voices.size(); // Use all available voices for unison
 
-    for (int i = 0; i < numActiveVoices; ++i) {
+    for (int i = 0; i < numUnisonVoicesToUse; ++i) {
       float detuneFactor = 0.0f;
-      if (numActiveVoices > 1) {
-        detuneFactor =
-            (static_cast<float>(i) / static_cast<float>(numActiveVoices - 1) -
-             0.5f) *
-            2.0f;
+      float panFactor = 0.0f;
+
+      if (numUnisonVoicesToUse > 1) {
+        // Detune factor: -1.0 to 1.0 spread across voices
+        detuneFactor = (static_cast<float>(i) / static_cast<float>(numUnisonVoicesToUse - 1) - 0.5f) * 2.0f;
+        // Pan factor: -1.0 to 1.0 spread across voices
+        panFactor = detuneFactor; // Simple: pan follows detune factor
       }
-      if (numActiveVoices <= 1 && i == 0) {
-        detuneFactor = 0.0f;
+      
+      // Center voice (if odd number of voices) gets no detune/pan
+      if (numUnisonVoicesToUse % 2 == 1 && i == numUnisonVoicesToUse / 2) {
+          detuneFactor = 0.0f;
+          panFactor = 0.0f;
       }
 
-      float detunedFreq =
-          tunedFreq *
-          std::pow(2.0f, (unisonDetuneCents * detuneFactor) / 1200.0f);
 
-      voices[i].setNoteOnTimestamp(currentNoteTimestamp);
-      voices[i].noteOn(detunedFreq, velocity, midiNote, glideEnabled,
-                       glideTimeSetting);
+      float detunedFreq = tunedFreq * std::pow(2.0f, (unisonDetuneCents * detuneFactor) / 1200.0f);
+      float panValue = panFactor * unisonStereoSpread_;
+      
+      voices[i].setPanning(std::clamp(panValue, -1.0f, 1.0f));
+      voices[i].setNoteOnTimestamp(currentNoteTimestamp); // All unison voices get same timestamp for stealing logic if needed later
+      voices[i].noteOn(detunedFreq, velocity, midiNote, glideEnabled, glideTimeSetting);
     }
-    currentNoteTimestamp++;
+    currentNoteTimestamp++; // Increment once per unison "event"
   } else {
     Voice *voice = findFreeVoice();
     if (voice) {
+      voice->setPanning(0.0f); // Center pan for non-unison notes
       voice->setNoteOnTimestamp(currentNoteTimestamp++);
-      
-      voice->noteOn(tunedFreq, velocity, midiNote, glideEnabled,
-                    glideTimeSetting);
+      voice->noteOn(tunedFreq, velocity, midiNote, glideEnabled, glideTimeSetting);
     }
   }
 }
 
 void PolySynth::noteOff(int midiNote) {
   if (unisonEnabled) {
-    if (midiNote == lastUnisonNote) {
+    if (midiNote == lastUnisonNote) { // Only turn off the "active" unison note
       for (auto &voice : voices) {
-        if (voice.isActive() && voice.getNoteNumber() == midiNote) {
+        // In unison, all voices might be playing the same "note number" conceptually
+        // but they were triggered for lastUnisonNote.
+        if (voice.isActive() && voice.getNoteNumber() == lastUnisonNote) {
           voice.noteOff();
         }
       }
-      lastUnisonNote = -1;
+      lastUnisonNote = -1; // Reset lastUnisonNote after turning off
       lastUnisonVelocity = 0.0f;
     }
   } else {
@@ -100,10 +111,10 @@ void PolySynth::noteOff(int midiNote) {
   }
 }
 
-float PolySynth::process() {
-  float mixed = 0.0f;
+StereoSample PolySynth::process() {
+  float mixedL = 0.0f;
+  float mixedR = 0.0f;
   int activeVoiceCount = 0;
-  // static int frameCounter = 0; // This was for debug, can be removed or kept if needed
 
   float lfoValue = lfo.step();
 
@@ -152,42 +163,53 @@ float PolySynth::process() {
 
   for (int i = 0; i < voices.size(); ++i) {
     if (voices[i].isActive()) {
-      float singleVoiceOutput = voices[i].process(currentLfoModulations, pitchBendValue_, pitchBendRangeSemitones_);
-      mixed += singleVoiceOutput;
+      float monoVoiceOutput = voices[i].process(currentLfoModulations, pitchBendValue_, pitchBendRangeSemitones_);
+      
+      float pan = voices[i].getPanning(); // -1.0 (L) to 1.0 (R)
+      // Constant power pan law:
+      // panAngle is mapped from -1..1 to 0..PI/2
+      float panAngle = (pan + 1.0f) * 0.5f * static_cast<float>(M_PI_2);
+      float gainL = std::cos(panAngle);
+      float gainR = std::sin(panAngle);
+
+      mixedL += monoVoiceOutput * gainL;
+      mixedR += monoVoiceOutput * gainR;
       activeVoiceCount++;
     }
   }
   
+  StereoSample outputSample;
   if (activeVoiceCount == 0) {
-    return 0.0f;
-  }
-
-  float normalizationFactor;
-  if (unisonEnabled) {
-    normalizationFactor = static_cast<float>(std::max(1, maxVoices / 2)) * 3.0f;
-    if (normalizationFactor < 1.0f) {
-      normalizationFactor = 1.0f;
-    }
+    outputSample.L = 0.0f;
+    outputSample.R = 0.0f;
   } else {
-    normalizationFactor = static_cast<float>(std::max(1, maxVoices / 2));
-     if (normalizationFactor < 1.0f) { // Ensure normalizationFactor is at least 1
-      normalizationFactor = 1.0f;
+    float normalizationFactor;
+    if (unisonEnabled) {
+        int numUnisonVoicesToUse = voices.size(); // Define numUnisonVoicesToUse for normalization base
+        normalizationFactor = static_cast<float>(std::max(1, numUnisonVoicesToUse / 2)) * 1.5f; // Heuristic
+        if (normalizationFactor < 1.0f) normalizationFactor = 1.0f;
+
+    } else {
+        normalizationFactor = static_cast<float>(std::max(1, maxVoices / 2));
+        if (normalizationFactor < 1.0f) normalizationFactor = 1.0f;
     }
+    
+    outputSample.L = mixedL / normalizationFactor;
+    outputSample.R = mixedR / normalizationFactor;
   }
 
-  if (mixed == 0.0f) {
-    return 0.0f;
-  }
-
-  float final_output = mixed / normalizationFactor;
   
-  float effected_output = final_output;
+  float effectedL = outputSample.L;
+  float effectedR = outputSample.R;
   for (const auto &effect : effectsChain) {
     if (effect && effect->isEnabled()) {
-      effected_output = effect->processSample(effected_output);
+      effect->processStereoSample(effectedL, effectedR, effectedL, effectedR);
     }
   }
-  return effected_output;
+  outputSample.L = effectedL;
+  outputSample.R = effectedR;
+
+  return outputSample;
 }
 
 Voice *PolySynth::findFreeVoice() {
@@ -198,10 +220,10 @@ Voice *PolySynth::findFreeVoice() {
   }
 
   Voice *quietestReleasingVoice = nullptr;
-  float minAmpEnvLevel = 2.0f;
+  float minAmpEnvLevel = 2.0f; // Needs to be higher than max possible envelope level (1.0)
 
   for (auto &voice : voices) {
-    if (!voice.isGateOpen() && voice.areEnvelopesActive()) {
+    if (!voice.isGateOpen() && voice.areEnvelopesActive()) { // Voice is in release phase
       float currentAmpLevel = voice.getAmpEnvLevel();
       if (currentAmpLevel < minAmpEnvLevel) {
         minAmpEnvLevel = currentAmpLevel;
@@ -213,20 +235,20 @@ Voice *PolySynth::findFreeVoice() {
     return quietestReleasingVoice;
   }
 
+  // If all voices are active (sustaining or attacking/decaying), find the oldest one.
   Voice *oldestSustainingVoice = nullptr;
-  unsigned long long oldestTimestamp = currentNoteTimestamp;
+  unsigned long long oldestTimestamp = currentNoteTimestamp; // Smallest timestamp is oldest
 
   for (auto &voice : voices) {
-    if (voice.isGateOpen()) {
       if (voice.getNoteOnTimestamp() < oldestTimestamp) {
-        oldestTimestamp = voice.getNoteOnTimestamp();
-        oldestSustainingVoice = &voice;
+          oldestTimestamp = voice.getNoteOnTimestamp();
+          oldestSustainingVoice = &voice;
       }
-    }
   }
-  if (oldestSustainingVoice) {
+   if (oldestSustainingVoice) {
     return oldestSustainingVoice;
   }
+
 
   return voices.empty() ? nullptr : &voices[0];
 }
@@ -247,6 +269,10 @@ void PolySynth::setWaveform(Waveform wf) {
 void PolySynth::setNoiseLevel(float level) {
   for (auto &voice : voices)
     voice.setNoiseLevel(level);
+}
+void PolySynth::setRingModLevel(float level) {
+  for (auto &voice : voices)
+    voice.setRingModLevel(level);
 }
 void PolySynth::setOsc1Level(float level) {
   for (auto &voice : voices)
@@ -393,21 +419,25 @@ void PolySynth::setWheelModAmountToFilter(float amount) {
 }
 
 void PolySynth::setUnisonEnabled(bool enabled) {
-  if (unisonEnabled && !enabled) {
+  if (unisonEnabled && !enabled) { 
     for (auto &voice : voices) {
-      if (voice.isActive()) {
-      }
+        if (voice.isActive()) {
+             voice.setPanning(0.0f);
+        }
     }
-    lastUnisonNote = -1;
+    lastUnisonNote = -1; 
   }
   unisonEnabled = enabled;
-  if (enabled) {
-  }
 }
 
 void PolySynth::setUnisonDetuneCents(float cents) {
   unisonDetuneCents = std::max(0.0f, cents);
 }
+
+void PolySynth::setUnisonStereoSpread(float spread) {
+    unisonStereoSpread_ = std::clamp(spread, 0.0f, 1.0f);
+}
+
 
 void PolySynth::setGlideEnabled(bool enabled) { glideEnabled = enabled; }
 
@@ -424,7 +454,7 @@ void PolySynth::setPitchBend(float value) {
 }
 
 void PolySynth::setPitchBendRange(float semitones) {
-    pitchBendRangeSemitones_ = std::max(0.0f, semitones); // Range should be non-negative
+    pitchBendRangeSemitones_ = std::max(0.0f, semitones); 
 }
 
 void PolySynth::addEffect(std::unique_ptr<AudioEffect> effect) {
@@ -448,7 +478,8 @@ void PolySynth::setAnalogPWDriftDepth(float depth) {
 }
 
 void PolySynth::setOscHarmonicAmplitude(int oscNum, int harmonicIndex, float amplitude) {
-    if (harmonicIndex < 0 || harmonicIndex >= 10) { 
+    if (harmonicIndex < 0 || harmonicIndex >= 16) { 
+        std::cerr << "PolySynth::setOscHarmonicAmplitude: Harmonic index " << harmonicIndex << " out of range." << std::endl;
         return;
     }
 

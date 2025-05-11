@@ -6,6 +6,7 @@
 #include "waveform.h" // For Waveform enum
 #include <memory>     // For std::unique_ptr
 #include <vector>
+#include <utility> // For std::pair
 
 // LFO Destinations
 enum class LfoDestination {
@@ -23,18 +24,24 @@ enum class WheelModSource { LFO, NOISE };
 
 class AudioEffect; // Forward declaration
 
+struct StereoSample {
+    float L = 0.0f;
+    float R = 0.0f;
+};
+
 class PolySynth {
 public:
   PolySynth(int sampleRate = 44100, int maxVoices = 16);
   void noteOn(int midiNote, float velocity);
   void noteOff(int midiNote);
-  float process(); // Generates one sample
+  StereoSample process(); // Generates one stereo sample pair
 
   // Global Voice Parameters
   void setWaveform(Waveform wf); // Sets for both OSCs in all voices
   void setOsc1Level(float);
   void setOsc2Level(float);
   void setNoiseLevel(float level);      // Global noise level for all voices
+  void setRingModLevel(float level);    // Global ring mod level for all voices
   void setVCOBDetuneCents(float cents); // For VCO B fine tune
   void setSyncEnabled(bool enabled);
   void setVCOBLowFreqEnabled(bool enabled);
@@ -85,6 +92,7 @@ public:
   // Unison Settings
   void setUnisonEnabled(bool enabled);
   void setUnisonDetuneCents(float cents);
+  void setUnisonStereoSpread(float spread); // 0.0 (mono) to 1.0 (max spread)
 
   // Glide/Portamento Settings
   void setGlideEnabled(bool enabled);
@@ -106,7 +114,7 @@ public:
   void setAnalogPWDriftDepth(float depth);    
 
   // Harmonic Amplitude Parameters (for Additive waveform)
-  void setOscHarmonicAmplitude(int oscNum, int harmonicIndex, float amplitude);
+  void setOscHarmonicAmplitude(int oscNum, int harmonicIndex, float amplitude); // harmonicIndex is 0-based
 
 private:
   std::vector<Voice> voices;
@@ -130,6 +138,7 @@ private:
 
   bool unisonEnabled = false;
   float unisonDetuneCents = 7.0f;
+  float unisonStereoSpread_ = 0.5f; 
   int lastUnisonNote = -1;
   float lastUnisonVelocity = 0.0f;
 

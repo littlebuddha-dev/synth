@@ -32,6 +32,7 @@ private:
     float osc1Level = 1.0f;
     float osc2Level = 0.0f;
     float noiseLevel = 0.0f;
+    float ringModLevel_ = 0.0f; 
 
     float lastOsc2 = 0.0f;
 
@@ -76,6 +77,8 @@ private:
     float pitchDriftDepthCents; 
     float pwDriftDepth;         
 
+    float panning_ = 0.0f; // -1.0 (L) to 1.0 (R)
+
     void noteOnDetailed(float newTargetFrequency, float normalizedVelocity, int midiNoteNum, bool useGlide, float glideTimeSec);
 
 
@@ -106,7 +109,8 @@ public:
     void setOsc1Level(float level);
     void setOsc2Level(float level);
     void setNoiseLevel(float level);
-    void setMixLevels(float level1, float level2, float noise);
+    void setRingModLevel(float level);
+    void setMixLevels(float level1, float level2, float noise, float ringMod);
 
     void setVCOBDetuneCents(float cents);
     void setSyncEnabled(bool enabled);
@@ -138,4 +142,7 @@ public:
 
     void setOsc1HarmonicAmplitude(int harmonicIndex, float amplitude); 
     void setOsc2HarmonicAmplitude(int harmonicIndex, float amplitude); 
+
+    void setPanning(float pan); // -1.0 (L) to 1.0 (R)
+    float getPanning() const;
 };

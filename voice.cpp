@@ -4,6 +4,7 @@
 #include "envelope.h" 
 #include <random>
 #include <iostream> // For std::cout in debug, remove in production
+#include <algorithm> // For std::clamp
 
 std::default_random_engine generator; // Should this be per-voice or global? Global for now.
 std::uniform_real_distribution<float> distribution(-1.0f, 1.0f); 
@@ -42,6 +43,8 @@ Voice::Voice(int sampleRate_, int numHarmonics)
       firstNoteForThisVoiceInstance(true)
       , pitchDriftDepthCents(0.0f) 
       , pwDriftDepth(0.0f)
+      , ringModLevel_(0.0f)
+      , panning_(0.0f)
 { 
 }
 
@@ -62,7 +65,9 @@ void Voice::noteOnDetailed(float newTargetFrequency, float normVelocity, int mid
     }
 
     osc1.noteOn();
+    osc1.resetPhase(); // Reset phase for potential SuperSaw consistency
     osc2.noteOn();
+    osc2.resetPhase(); // Reset phase for potential SuperSaw consistency
     envelopes[0].noteOn(); 
     envelopes[1].noteOn(); 
     filter.setNote(noteNumber); 
@@ -207,7 +212,9 @@ float Voice::process(const LfoModulationValues& lfoMod, float currentPitchBendVa
 
     // --- Mixer & Filter ---
     float noise = distribution(generator);
-    float mixed = (osc1Level * s1_output + osc2Level * s2_output + noiseLevel * noise);
+    float ringModOutput = s1_output * s2_output * ringModLevel_;
+    float mixed = (osc1Level * s1_output + osc2Level * s2_output + noiseLevel * noise + ringModOutput);
+
 
     float vcfLfoModOffset = lfoMod.vcfCutoffMod; // Already includes LFO + Wheel for VCF in Hz
     // PolyMod to Filter Cutoff (Hz offsets)
@@ -235,14 +242,18 @@ void Voice::setWaveform(Waveform wf) {
     osc2.setWaveform(wf);
 }
 
-void Voice::setOsc1Level(float level) { osc1Level = level; }
-void Voice::setOsc2Level(float level) { osc2Level = level; }
-void Voice::setNoiseLevel(float level) { noiseLevel = level; }
-void Voice::setMixLevels(float level1, float level2, float noise) {
-    osc1Level = level1;
-    osc2Level = level2;
-    noiseLevel = noise;
+void Voice::setOsc1Level(float level) { osc1Level = std::clamp(level, 0.0f, 1.0f); }
+void Voice::setOsc2Level(float level) { osc2Level = std::clamp(level, 0.0f, 1.0f); }
+void Voice::setNoiseLevel(float level) { noiseLevel = std::clamp(level, 0.0f, 1.0f); }
+void Voice::setRingModLevel(float level) { ringModLevel_ = std::clamp(level, 0.0f, 1.0f); }
+
+void Voice::setMixLevels(float level1, float level2, float noise, float ringMod) {
+    osc1Level = std::clamp(level1, 0.0f, 1.0f);
+    osc2Level = std::clamp(level2, 0.0f, 1.0f);
+    noiseLevel = std::clamp(noise, 0.0f, 1.0f);
+    ringModLevel_ = std::clamp(ringMod, 0.0f, 1.0f);
 }
+
 
 void Voice::setVCOBDetuneCents(float cents) { vcoBDetuneCents = cents; }
 void Voice::setSyncEnabled(bool enabled) { syncEnabled = enabled; }
@@ -321,4 +332,12 @@ void Voice::setOsc1HarmonicAmplitude(int harmonicIndex, float amplitude) {
 
 void Voice::setOsc2HarmonicAmplitude(int harmonicIndex, float amplitude) {
     osc2.setHarmonicAmplitude(harmonicIndex, amplitude);
+}
+
+void Voice::setPanning(float pan) {
+    panning_ = std::clamp(pan, -1.0f, 1.0f);
+}
+
+float Voice::getPanning() const {
+    return panning_;
 }

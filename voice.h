@@ -6,16 +6,16 @@
 #include "vcf.h"
 #include "envelope.h"
 #include "lfo.h"
-#include "analog_drift.h" // Include for analog drift
+#include "analog_drift.h" 
 
 struct LfoModulationValues {
-    float osc1FreqMod = 0.0f;
-    float osc2FreqMod = 0.0f;
+    float osc1FreqMod = 0.0f; // Semitones from LFO & Wheel
+    float osc2FreqMod = 0.0f; // Semitones from LFO & Wheel
     float osc1PwMod = 0.0f;
     float osc2PwMod = 0.0f;
     float wheelOsc1PwOffset = 0.0f; 
     float wheelOsc2PwOffset = 0.0f; 
-    float vcfCutoffMod = 0.0f;
+    float vcfCutoffMod = 0.0f;  // Hz offset from LFO & Wheel
 };
 
 
@@ -38,6 +38,8 @@ private:
     float vcoBDetuneCents = 0.0f;
     bool vcoBLowFreqEnabled = false;
     float vcoBFreqKnob = 0.5f;
+    bool vcoBKeyFollowEnabled_;       
+    float vcoBFixedBaseFreq_;         
 
     bool syncEnabled = false;
 
@@ -57,7 +59,7 @@ private:
 
     unsigned long long noteOnTimestamp = 0;
 
-    float currentOutputFreq;             
+    float currentOutputFreq;             // Current glided, *unbent* frequency of the note
     float targetKeyFreq;                 
     float glideStartFreqForCurrentSegment; 
     float glideLogStep;                    
@@ -71,24 +73,20 @@ private:
     AnalogDrift analogDriftPitch2;
     AnalogDrift analogDriftPW1;
     AnalogDrift analogDriftPW2;
-    float pitchDriftDepthCents; // Max drift in cents
-    float pwDriftDepth;         // Max PW offset (e.g., 0.0 to 0.45)
+    float pitchDriftDepthCents; 
+    float pwDriftDepth;         
 
-    // Internal detailed noteOn method, takes pre-calculated frequency
     void noteOnDetailed(float newTargetFrequency, float normalizedVelocity, int midiNoteNum, bool useGlide, float glideTimeSec);
 
 
 public:
     Voice(int sampleRate, int numHarmonics);
     
-    // This is the primary noteOn method called by PolySynth.
-    // `freq` is pre-calculated by PolySynth (includes master tuning, unison detune)
-    // `velocity` is MIDI 0-127
-    // `midiNoteNum` is the original MIDI note for key tracking etc.
     void noteOn(float freq, float velocity, int midiNoteNum, bool globalGlideEnabled, float globalGlideTimeSeconds);
     
     void noteOff();
-    float process(const LfoModulationValues& lfoMod);
+    // Modified process method to accept pitch bend parameters
+    float process(const LfoModulationValues& lfoMod, float currentPitchBendValue, float pitchBendRangeInSemitones);
     bool isActive() const;
     
     float getTargetKeyFrequency() const { return targetKeyFreq; }; 
@@ -116,6 +114,7 @@ public:
     void setPWMDepth(float depth);
     void setVCOBLowFreqEnabled(bool enabled);
     void setVCOBFreqKnob(float knobValue); 
+    void setVCOBKeyFollowEnabled(bool enabled); 
     void setFilterEnvVelocitySensitivity(float amount); 
     void setAmpVelocitySensitivity(float amount);       
 
@@ -134,7 +133,9 @@ public:
     void setAmpEnvelope(const EnvelopeParams& p);
     void setFilterEnvelope(const EnvelopeParams& p);
 
-    // Analog Drift Setters
     void setPitchDriftDepth(float cents);
     void setPWDriftDepth(float depth);
+
+    void setOsc1HarmonicAmplitude(int harmonicIndex, float amplitude); 
+    void setOsc2HarmonicAmplitude(int harmonicIndex, float amplitude); 
 };

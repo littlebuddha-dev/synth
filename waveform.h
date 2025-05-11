@@ -1,3 +1,4 @@
+// synth/waveform.h
 #pragma once
 
 enum class Waveform {
@@ -5,5 +6,6 @@ enum class Waveform {
     Saw,
     Square,
     Triangle,
-    Pulse
+    Pulse,
+    Additive // New waveform type for harmonic control
 };

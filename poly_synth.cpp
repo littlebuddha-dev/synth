@@ -1,141 +1,11 @@
 // synth/poly_synth.cpp
 #include "poly_synth.h"
-#include "effects/audio_effect.h" // Include the base effect class
-#include "effects/reverb_effect.h"
+#include "effects/audio_effect.h" 
 #include "voice.h"
 #include "waveform.h"
-#include "envelope.h"
-#include "synth_parameters.h"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
-#include <vector>
-
-bool PolySynth::setParameter(SynthParams::ParamID paramID, float value) {
-    // value の範囲チェックは各セッターに任せるか、ここでも行う
-    // ここでは、既存のセッターを呼び出す形にする
-    switch (paramID) {
-        case SynthParams::ParamID::MasterTuneCents: setMasterTuneCents(value); break;
-        case SynthParams::ParamID::Osc1Level: setOsc1Level(value); break;
-        case SynthParams::ParamID::Osc2Level: setOsc2Level(value); break;
-        case SynthParams::ParamID::NoiseLevel: setNoiseLevel(value); break;
-        case SynthParams::ParamID::VCOBDetuneCents: setVCOBDetuneCents(value); break;
-        case SynthParams::ParamID::VCOBFreqKnob: setVCOBFreqKnob(value); break;
-        // ... (float を取るパラメータの case を追加) ...
-        case SynthParams::ParamID::FilterEnvVelocitySensitivity: setFilterEnvVelocitySensitivity(value); break;
-        case SynthParams::ParamID::AmpVelocitySensitivity: setAmpVelocitySensitivity(value); break;
-        case SynthParams::ParamID::PulseWidth: setPulseWidth(value); break;
-        case SynthParams::ParamID::PWMDepth: setPWMDepth(value); break;
-
-        case SynthParams::ParamID::PMFilterEnvToFreqAAmount: setPMFilterEnvToFreqAAmount(value); break;
-        case SynthParams::ParamID::PMFilterEnvToPWAAmount: setPMFilterEnvToPWAAmount(value); break;
-        case SynthParams::ParamID::PMFilterEnvToFilterCutoffAmount: setPMFilterEnvToFilterCutoffAmount(value); break;
-        case SynthParams::ParamID::PMOscBToFreqAAmount: setPMOscBToFreqAAmount(value); break;
-        case SynthParams::ParamID::PMOscBToPWAAmount: setPMOscBToPWAAmount(value); break;
-        case SynthParams::ParamID::PMOscBToFilterCutoffAmount: setPMOscBToFilterCutoffAmount(value); break;
-
-        case SynthParams::ParamID::VCFBaseCutoff: setVCFBaseCutoff(value); break;
-        case SynthParams::ParamID::VCFResonance: setVCFResonance(value); break;
-        case SynthParams::ParamID::VCFKeyFollow: setVCFKeyFollow(value); break;
-        case SynthParams::ParamID::VCFEnvelopeAmount: setVCFEnvelopeAmount(value); break;
-        
-        case SynthParams::ParamID::LfoRate: setLfoRate(value); break;
-        case SynthParams::ParamID::LfoAmountToVco1Freq: setLfoAmountToVco1Freq(value); break;
-        case SynthParams::ParamID::LfoAmountToVco2Freq: setLfoAmountToVco2Freq(value); break;
-        case SynthParams::ParamID::LfoAmountToVco1Pw: setLfoAmountToVco1Pw(value); break;
-        case SynthParams::ParamID::LfoAmountToVco2Pw: setLfoAmountToVco2Pw(value); break;
-        case SynthParams::ParamID::LfoAmountToVcfCutoff: setLfoAmountToVcfCutoff(value); break;
-
-        case SynthParams::ParamID::ModulationWheelValue: setModulationWheelValue(value); break;
-        case SynthParams::ParamID::WheelModAmountToFreqA: setWheelModAmountToFreqA(value); break;
-        case SynthParams::ParamID::WheelModAmountToFreqB: setWheelModAmountToFreqB(value); break;
-        case SynthParams::ParamID::WheelModAmountToPWA: setWheelModAmountToPWA(value); break;
-        case SynthParams::ParamID::WheelModAmountToPWB: setWheelModAmountToPWB(value); break;
-        case SynthParams::ParamID::WheelModAmountToFilter: setWheelModAmountToFilter(value); break;
-        
-        case SynthParams::ParamID::UnisonDetuneCents: setUnisonDetuneCents(value); break;
-        case SynthParams::ParamID::GlideTime: setGlideTime(value); break;
-
-        case SynthParams::ParamID::AnalogPitchDriftDepth: setAnalogPitchDriftDepth(value); break;
-        case SynthParams::ParamID::AnalogPWDriftDepth: setAnalogPWDriftDepth(value); break;
-
-        // Effects (Reverb example)
-        case SynthParams::ParamID::ReverbDryWetMix:
-            if (!effectsChain.empty() && dynamic_cast<ReverbEffect*>(effectsChain.back().get())) { // 最後のeffectがReverbと仮定
-                dynamic_cast<ReverbEffect*>(effectsChain.back().get())->setDryWetMix(value);
-            } else return false;
-            break;
-        case SynthParams::ParamID::ReverbRoomSize:
-             if (!effectsChain.empty() && dynamic_cast<ReverbEffect*>(effectsChain.back().get())) {
-                dynamic_cast<ReverbEffect*>(effectsChain.back().get())->setRoomSize(value);
-            } else return false;
-            break;
-        // ... (他のリバーブパラメータも同様に) ...
-
-        // int/bool/enum を取るパラメータは setParameterInt で処理
-        default:
-            // または、float を int にキャストして setParameterInt を呼ぶか、エラーを返す
-            return setParameterInt(paramID, static_cast<int>(value));
-            // return false; // Invalid parameter for float value
-    }
-    return true;
-}
-
-bool PolySynth::setParameterInt(SynthParams::ParamID paramID, int value) {
-    switch (paramID) {
-        case SynthParams::ParamID::Waveform: setWaveform(static_cast<Waveform>(value)); break;
-        case SynthParams::ParamID::SyncEnabled: setSyncEnabled(static_cast<bool>(value)); break;
-        case SynthParams::ParamID::VCOBLowFreqEnabled: setVCOBLowFreqEnabled(static_cast<bool>(value)); break;
-        // ... (int, bool, enum を取るパラメータの case を追加) ...
-        case SynthParams::ParamID::LfoWaveform: setLfoWaveform(static_cast<LfoWaveform>(value)); break;
-        case SynthParams::ParamID::WheelModSource: setWheelModSource(static_cast<WheelModSource>(value)); break;
-        case SynthParams::ParamID::UnisonEnabled: setUnisonEnabled(static_cast<bool>(value)); break;
-        case SynthParams::ParamID::GlideEnabled: setGlideEnabled(static_cast<bool>(value)); break;
-
-        // Effects (Reverb example)
-        case SynthParams::ParamID::ReverbEnabled:
-            if (!effectsChain.empty() && dynamic_cast<ReverbEffect*>(effectsChain.back().get())) {
-                dynamic_cast<ReverbEffect*>(effectsChain.back().get())->setEnabled(static_cast<bool>(value));
-            } else return false;
-            break;
-
-        // float を取るパラメータは setParameter で処理
-        default:
-            // または、int を float にキャストして setParameter を呼ぶか、エラーを返す
-            // return setParameter(paramID, static_cast<float>(value));
-            return false; // Invalid parameter for int value
-    }
-    return true;
-}
-
-// getParameter の実装は省略（必要に応じて同様に switch 文で実装）
-float PolySynth::getParameter(SynthParams::ParamID paramID) {
-    // TODO: Implement getter logic
-    // 例:
-    // switch(paramID) {
-    //    case SynthParams::ParamID::Osc1Level: return voices.empty() ? 0.0f : voices[0].getOsc1Level(); // 最初のボイスの値、またはグローバル値を取得
-    // ...
-    // }
-    std::cerr << "getParameter for ID " << static_cast<int>(paramID) << " not fully implemented." << std::endl;
-    return 0.0f; // Placeholder
-}
-
-
-bool PolySynth::setEnvelopeParams(SynthParams::ParamID baseParamID, const EnvelopeParams& params) {
-    if (baseParamID == SynthParams::ParamID::AmpEnvAttack) { // AmpEnvAttackを代表IDとする
-        setAmpEnvelope(params);
-        return true;
-    } else if (baseParamID == SynthParams::ParamID::FilterEnvAttack) { // FilterEnvAttackを代表IDとする
-        setFilterEnvelope(params);
-        return true;
-    }
-    return false;
-}
-
-// EnvelopeParams PolySynth::getEnvelopeParams(SynthParams::ParamID baseParamID) {
-//    // TODO: Implement getter
-//    return {};
-// }
 
 PolySynth::PolySynth(int sr, int maxNumVoices)
     : sampleRate(sr), maxVoices(maxNumVoices), lfo(sr), currentNoteTimestamp(0),
@@ -147,27 +17,25 @@ PolySynth::PolySynth(int sr, int maxNumVoices)
       wheelModNoiseDistribution(-1.0f, 1.0f), unisonEnabled(false),
       unisonDetuneCents(7.0f), lastUnisonNote(-1), lastUnisonVelocity(0.0f),
       glideEnabled(false), glideTimeSetting(0.05f),
-      masterTuneCents(0.0f), // Initialize masterTuneCents
-      analogPitchDriftDepth_(0.0f), // Initialize analog drift depth
-      analogPWDriftDepth_(0.0f)     // Initialize analog drift depth
+      masterTuneCents(0.0f), 
+      analogPitchDriftDepth_(0.0f), 
+      analogPWDriftDepth_(0.0f),
+      pitchBendValue_(0.0f),        // Initialize pitch bend
+      pitchBendRangeSemitones_(2.0f) // Default pitch bend range +/- 2 semitones
 {
   for (int i = 0; i < maxVoices; ++i) {
-    voices.emplace_back(Voice(sampleRate, 16));
+    voices.emplace_back(Voice(sampleRate, 16)); 
   }
   for (int i = 0; i < static_cast<int>(LfoDestination::NumDestinations); ++i) {
     lfoModAmounts[i] = 0.0f;
   }
-  // Initialize voices with current drift settings (if any were set before voices are fully ready)
-  // This ensures voices created here get the initial drift depth.
-  // More robustly, Voice constructor could take these, or a full reset method could exist.
+  
   setAnalogPitchDriftDepth(analogPitchDriftDepth_);
   setAnalogPWDriftDepth(analogPWDriftDepth_);
 }
 
 void PolySynth::noteOn(int midiNote, float velocity) {
-  // Calculate base frequency including master tune
-  // The formula is: A4_freq * 2^(( (MIDI_note - 69) * 100_cents +
-  // master_tune_cents ) / 1200_cents)
+  
   float tunedFreq =
       440.0f * std::pow(2.0f, ((static_cast<float>(midiNote) - 69.0f) * 100.0f +
                                masterTuneCents) /
@@ -177,7 +45,7 @@ void PolySynth::noteOn(int midiNote, float velocity) {
     lastUnisonNote = midiNote;
     lastUnisonVelocity = velocity;
 
-    // tunedFreq is already master-tuned and corresponds to the base MIDI note
+    
     int numActiveVoices = voices.size();
 
     for (int i = 0; i < numActiveVoices; ++i) {
@@ -205,7 +73,7 @@ void PolySynth::noteOn(int midiNote, float velocity) {
     Voice *voice = findFreeVoice();
     if (voice) {
       voice->setNoteOnTimestamp(currentNoteTimestamp++);
-      // Pass the master-tuned frequency to the voice
+      
       voice->noteOn(tunedFreq, velocity, midiNote, glideEnabled,
                     glideTimeSetting);
     }
@@ -235,7 +103,7 @@ void PolySynth::noteOff(int midiNote) {
 float PolySynth::process() {
   float mixed = 0.0f;
   int activeVoiceCount = 0;
-  static int frameCounter = 0;
+  // static int frameCounter = 0; // This was for debug, can be removed or kept if needed
 
   float lfoValue = lfo.step();
 
@@ -281,28 +149,16 @@ float PolySynth::process() {
   currentLfoModulations.wheelOsc2PwOffset = wheel_mod_pwB_offset;
   currentLfoModulations.vcfCutoffMod += wheel_mod_filter_hz_offset;
 
-  if (unisonEnabled && frameCounter % (sampleRate / 2) == 0) {
-  }
 
   for (int i = 0; i < voices.size(); ++i) {
     if (voices[i].isActive()) {
-      float singleVoiceOutput = voices[i].process(currentLfoModulations);
-      if (unisonEnabled && frameCounter % (sampleRate / 10) == 0 && i < 2) {
-      }
+      float singleVoiceOutput = voices[i].process(currentLfoModulations, pitchBendValue_, pitchBendRangeSemitones_);
       mixed += singleVoiceOutput;
       activeVoiceCount++;
     }
   }
-  if (unisonEnabled && frameCounter % (sampleRate / 2) == 0 &&
-      activeVoiceCount > 0) {
-  }
-
+  
   if (activeVoiceCount == 0) {
-    if (unisonEnabled && frameCounter % (sampleRate / 2) == 0) {
-    }
-    frameCounter++;
-    if (frameCounter >= sampleRate * 5)
-      frameCounter = 0;
     return 0.0f;
   }
 
@@ -312,34 +168,19 @@ float PolySynth::process() {
     if (normalizationFactor < 1.0f) {
       normalizationFactor = 1.0f;
     }
-    if (unisonEnabled && frameCounter % (sampleRate / 2) == 0 &&
-        activeVoiceCount > 0) {
-    }
   } else {
     normalizationFactor = static_cast<float>(std::max(1, maxVoices / 2));
+     if (normalizationFactor < 1.0f) { // Ensure normalizationFactor is at least 1
+      normalizationFactor = 1.0f;
+    }
   }
 
   if (mixed == 0.0f) {
-    if (unisonEnabled && frameCounter % (sampleRate / 2) == 0 &&
-        activeVoiceCount > 0) {
-    }
-    frameCounter++;
-    if (frameCounter >= sampleRate * 5)
-      frameCounter = 0;
     return 0.0f;
   }
 
   float final_output = mixed / normalizationFactor;
-
-  if (unisonEnabled && frameCounter % (sampleRate / 2) == 0 &&
-      activeVoiceCount > 0) {
-  }
-
-  frameCounter++;
-  if (frameCounter >= sampleRate * 5)
-    frameCounter = 0;
-
-  // Process through effects chain
+  
   float effected_output = final_output;
   for (const auto &effect : effectsChain) {
     if (effect && effect->isEnabled()) {
@@ -426,6 +267,10 @@ void PolySynth::setVCOBLowFreqEnabled(bool enabled) {
 void PolySynth::setVCOBFreqKnob(float value) {
   for (auto &voice : voices)
     voice.setVCOBFreqKnob(value);
+}
+void PolySynth::setVCOBKeyFollowEnabled(bool enabled) {
+  for (auto &voice : voices)
+    voice.setVCOBKeyFollowEnabled(enabled);
 }
 void PolySynth::setFilterEnvVelocitySensitivity(float amount) {
   for (auto &voice : voices)
@@ -571,10 +416,15 @@ void PolySynth::setGlideTime(float timeSeconds) {
 }
 
 void PolySynth::setMasterTuneCents(float cents) {
-  // Typical range for master tune might be +/- 100 cents (1 semitone)
-  // Or +/- 50 cents for finer control. Clamping can be added if desired.
-  // For now, allow any float value.
   masterTuneCents = cents;
+}
+
+void PolySynth::setPitchBend(float value) {
+    pitchBendValue_ = std::clamp(value, -1.0f, 1.0f);
+}
+
+void PolySynth::setPitchBendRange(float semitones) {
+    pitchBendRangeSemitones_ = std::max(0.0f, semitones); // Range should be non-negative
 }
 
 void PolySynth::addEffect(std::unique_ptr<AudioEffect> effect) {
@@ -584,17 +434,29 @@ void PolySynth::addEffect(std::unique_ptr<AudioEffect> effect) {
 void PolySynth::clearEffects() { effectsChain.clear(); }
 
 void PolySynth::setAnalogPitchDriftDepth(float cents) {
-    analogPitchDriftDepth_ = std::max(0.0f, cents); // Depth should not be negative
+    analogPitchDriftDepth_ = std::max(0.0f, cents); 
     for (auto& voice : voices) {
         voice.setPitchDriftDepth(analogPitchDriftDepth_);
     }
 }
 
 void PolySynth::setAnalogPWDriftDepth(float depth) {
-    // Depth for PW can be 0 to ~0.49 (max change to PW)
-    // Let's clamp to 0.0 - 0.45 for safety, preventing full flip.
     analogPWDriftDepth_ = std::clamp(depth, 0.0f, 0.45f); 
     for (auto& voice : voices) {
         voice.setPWDriftDepth(analogPWDriftDepth_);
+    }
+}
+
+void PolySynth::setOscHarmonicAmplitude(int oscNum, int harmonicIndex, float amplitude) {
+    if (harmonicIndex < 0 || harmonicIndex >= 10) { 
+        return;
+    }
+
+    for (auto& voice : voices) {
+        if (oscNum == 1) {
+            voice.setOsc1HarmonicAmplitude(harmonicIndex, amplitude);
+        } else if (oscNum == 2) {
+            voice.setOsc2HarmonicAmplitude(harmonicIndex, amplitude);
+        }
     }
 }

@@ -21,7 +21,7 @@ public:
 
     void setWaveform(Waveform wf);                         // メソッドの宣言のみ
     Waveform getWaveform() const;                          // メソッドの宣言のみ
-    void setNoiseLevel(float level);                       // メソッドの宣言のみ
+    // void setNoiseLevel(float level);                    // メソッドの宣言のみ (コメントアウトまたは削除)
     void resetPhase();                                     // メソッドの宣言のみ
     float getPhase() const;                                // メソッドの宣言のみ
     void setPulseWidth(float width);                       // メソッドの宣言のみ
@@ -29,22 +29,24 @@ public:
     void setPWMSource(float value);                        // メソッドの宣言のみ
     void setPolyModPWValue(float value);                   // メソッドの宣言のみ
     void setWheelModPWValue(float value);                  // メソッドの宣言のみ
+    void setHarmonicAmplitude(int harmonicIndex, float amplitude); // New: 0-based index
+    float getHarmonicAmplitude(int harmonicIndex) const;           // New: 0-based index
     void setDriftPWValue(float value);                     // メソッドの宣言のみ
     void sync();                                           // メソッドの宣言のみ
 
 private:
     int sampleRate;
-    int numHarmonics;
-    float baseFreq;
+    int numHarmonics; // Will define the max number of controllable harmonics
+    float baseFreq; // Frequency of the fundamental
     float phase;
     bool gateOpen;
     Waveform waveform;
 
-    std::vector<float> amplitudes;
+    // std::vector<float> amplitudes; // 元のamplitudesは削除またはコメントアウト
     std::vector<LFO> lfos;
     std::vector<Envelope> envelopes;
+    std::vector<float> harmonicAmplitudes_; // Stores amplitudes for each harmonic (index 0 = fundamental)
 
-    float noiseLevel; // このメンバ変数が .cpp ファイルの setNoiseLevel で使われることを想定
     std::mt19937 rng;
     std::uniform_real_distribution<float> noiseDist;
 
@@ -54,4 +56,7 @@ private:
     float polyModPWValue;
     float wheelModPWValue;
     float driftPWValue;
+
+    // float noiseLevel; // このメンバ変数が .cpp ファイルの setNoiseLevel で使われることを想定
+                        // Voice class has its own noise generator. Removing to avoid confusion.
 };

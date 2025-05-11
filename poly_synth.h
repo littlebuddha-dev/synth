@@ -6,8 +6,6 @@
 #include "waveform.h" // For Waveform enum
 #include <memory>     // For std::unique_ptr
 #include <vector>
-#include "synth_parameters.h"
-
 
 // LFO Destinations
 enum class LfoDestination {
@@ -41,11 +39,12 @@ public:
   void setSyncEnabled(bool enabled);
   void setVCOBLowFreqEnabled(bool enabled);
   void setVCOBFreqKnob(float value); // 0.0 to 1.0
+  void setVCOBKeyFollowEnabled(bool enabled); 
   void setFilterEnvVelocitySensitivity(float amount);
   void setAmpVelocitySensitivity(float amount);
   void setPulseWidth(float width); // Base PW for both OSCs
   void setPWMDepth(
-      float depth); // General PWM depth (might be combined with LFO amount)
+      float depth); 
 
   // PolyMod Parameters
   void setPMFilterEnvToFreqAAmount(float amount);
@@ -68,20 +67,20 @@ public:
   // LFO Parameters
   void setLfoRate(float rateHz);
   void setLfoWaveform(LfoWaveform wf);
-  void setLfoAmountToVco1Freq(float semitones); // Max semitones deviation
+  void setLfoAmountToVco1Freq(float semitones); 
   void setLfoAmountToVco2Freq(float semitones);
-  void setLfoAmountToVco1Pw(float normalizedAmount); // 0-1 scales PWM depth
+  void setLfoAmountToVco1Pw(float normalizedAmount); 
   void setLfoAmountToVco2Pw(float normalizedAmount);
-  void setLfoAmountToVcfCutoff(float hzOffset); // Max Hz deviation
+  void setLfoAmountToVcfCutoff(float hzOffset); 
 
   // Wheel Modulation Settings
-  void setModulationWheelValue(float value); // 0.0 to 1.0
+  void setModulationWheelValue(float value); 
   void setWheelModSource(WheelModSource source);
-  void setWheelModAmountToFreqA(float amount);  // Amount for VCO1/A Freq
-  void setWheelModAmountToFreqB(float amount);  // Amount for VCO2/B Freq
-  void setWheelModAmountToPWA(float amount);    // Amount for VCO1/A PW
-  void setWheelModAmountToPWB(float amount);    // Amount for VCO2/B PW
-  void setWheelModAmountToFilter(float amount); // Amount for VCF Cutoff
+  void setWheelModAmountToFreqA(float amount);  
+  void setWheelModAmountToFreqB(float amount);  
+  void setWheelModAmountToPWA(float amount);    
+  void setWheelModAmountToPWB(float amount);    
+  void setWheelModAmountToFilter(float amount); 
 
   // Unison Settings
   void setUnisonEnabled(bool enabled);
@@ -89,37 +88,32 @@ public:
 
   // Glide/Portamento Settings
   void setGlideEnabled(bool enabled);
-  void setGlideTime(float timeSeconds); // Time to glide between notes
+  void setGlideTime(float timeSeconds); 
 
   // Master Tune Setting
   void setMasterTuneCents(float cents);
+
+  // Pitch Bend Settings
+  void setPitchBend(float value); // -1.0 to 1.0
+  void setPitchBendRange(float semitones); // e.g., 2.0 for +/- 2 semitones
 
   // Effects Management
   void addEffect(std::unique_ptr<AudioEffect> effect);
   void clearEffects();
 
   // Analog Drift Parameters
-  void setAnalogPitchDriftDepth(float cents); // Max pitch deviation in cents
-  void setAnalogPWDriftDepth(float depth);    // Max PW deviation (0.0 to ~0.45)
-  
-   // --- Generic Parameter Access ---
-    // Returns false if parameter ID is invalid or value is out of range
-    bool setParameter(SynthParams::ParamID paramID, float value);
-    bool setParameterInt(SynthParams::ParamID paramID, int value); // For int/bool/enum params
-    float getParameter(SynthParams::ParamID paramID); // Might need getParameterInt too
-    // int getParameterInt(SynthParams::ParamID paramID);
+  void setAnalogPitchDriftDepth(float cents); 
+  void setAnalogPWDriftDepth(float depth);    
 
-    // For parameters like envelopes that take multiple values
-    bool setEnvelopeParams(SynthParams::ParamID baseParamID, const EnvelopeParams& params);
-    // EnvelopeParams getEnvelopeParams(SynthParams::ParamID baseParamID);
-
+  // Harmonic Amplitude Parameters (for Additive waveform)
+  void setOscHarmonicAmplitude(int oscNum, int harmonicIndex, float amplitude);
 
 private:
   std::vector<Voice> voices;
   int sampleRate;
   int maxVoices;
 
-  LFO lfo; // Shared LFO for all voices
+  LFO lfo; 
 
   float lfoModAmounts[static_cast<int>(LfoDestination::NumDestinations)];
 
@@ -145,7 +139,10 @@ private:
   float analogPitchDriftDepth_; 
   float analogPWDriftDepth_;   
 
-  float masterTuneCents = 0.0f; // Master tuning in cents relative to A4=440Hz
+  float masterTuneCents = 0.0f; 
+
+  float pitchBendValue_; // -1.0 to 1.0, center is 0.0
+  float pitchBendRangeSemitones_; // Default +/- 2 semitones
 
   std::vector<std::unique_ptr<AudioEffect>> effectsChain;
 

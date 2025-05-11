@@ -1,3 +1,3 @@
 # synth
-analog synthesizer library
-MIT License	
+simple analog synthesizer library.
+MIT License.

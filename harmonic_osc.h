@@ -1,54 +1,57 @@
 // synth/harmonic_osc.h
 #pragma once
-#include "envelope.h" // For Envelope
-#include "lfo.h"      // For LFO full definition
-#include "waveform.h" // For Waveform enum
+#include "envelope.h" 
+#include "lfo.h"      
+#include "waveform.h" 
 #include <vector>
 #include <random>
 #include <cmath>
-#include <algorithm> // For std::clamp
+#include <algorithm> 
 
-class HarmonicOscillator { // ← クラスの宣言が最初に来る
+#ifndef M_PI
+#define M_PI (3.14159265358979323846)
+#endif
+
+
+class HarmonicOscillator { 
 public:
-    HarmonicOscillator(int sampleRate, int numHarmonics); // メソッドの宣言のみ
-    void setFrequency(float freq);                         // メソッドの宣言のみ
-    float getBaseFrequency() const;                        // メソッドの宣言のみ
-    void noteOn();                                         // メソッドの宣言のみ
-    void noteOff();                                        // メソッドの宣言のみ
-    float process();                                       // メソッドの宣言のみ
-    bool isRunning() const;                                // メソッドの宣言のみ
-    bool isGateOpen() const;                               // メソッドの宣言のみ
+    HarmonicOscillator(int sampleRate, int numHarmonics); 
+    void setFrequency(float freq);                         
+    float getBaseFrequency() const;                        
+    void noteOn();                                         
+    void noteOff();                                        
+    float process();                                       
+    bool isRunning() const;                                
+    bool isGateOpen() const;                               
 
-    void setWaveform(Waveform wf);                         // メソッドの宣言のみ
-    Waveform getWaveform() const;                          // メソッドの宣言のみ
-    // void setNoiseLevel(float level);                    // メソッドの宣言のみ (コメントアウトまたは削除)
-    void resetPhase();                                     // メソッドの宣言のみ
-    float getPhase() const;                                // メソッドの宣言のみ
-    void setPulseWidth(float width);                       // メソッドの宣言のみ
-    void setPWMDepth(float depth);                         // メソッドの宣言のみ
-    void setPWMSource(float value);                        // メソッドの宣言のみ
-    void setPolyModPWValue(float value);                   // メソッドの宣言のみ
-    void setWheelModPWValue(float value);                  // メソッドの宣言のみ
-    void setHarmonicAmplitude(int harmonicIndex, float amplitude); // New: 0-based index
-    float getHarmonicAmplitude(int harmonicIndex) const;           // New: 0-based index
-    void setDriftPWValue(float value);                     // メソッドの宣言のみ
-    void sync();                                           // メソッドの宣言のみ
+    void setWaveform(Waveform wf);                         
+    Waveform getWaveform() const;                          
+    void resetPhase();                                     
+    float getPhase() const;                                
+    void setPulseWidth(float width);                       
+    void setPWMDepth(float depth);                         
+    void setPWMSource(float value);                        
+    void setPolyModPWValue(float value);                   
+    void setWheelModPWValue(float value);                  
+    void setHarmonicAmplitude(int harmonicIndex, float amplitude); 
+    float getHarmonicAmplitude(int harmonicIndex) const;           
+    void setDriftPWValue(float value);                     
+    void sync();                                           
 
 private:
     int sampleRate;
-    int numHarmonics; // Will define the max number of controllable harmonics
-    float baseFreq; // Frequency of the fundamental
+    int numHarmonics; 
+    float baseFreq; 
     float phase;
     bool gateOpen;
     Waveform waveform;
 
-    // std::vector<float> amplitudes; // 元のamplitudesは削除またはコメントアウト
-    std::vector<LFO> lfos;
-    std::vector<Envelope> envelopes;
-    std::vector<float> harmonicAmplitudes_; // Stores amplitudes for each harmonic (index 0 = fundamental)
+    std::vector<LFO> lfos; // These seem unused currently for direct osc modulation
+    std::vector<Envelope> envelopes; // These also seem unused currently for direct osc modulation
+    std::vector<float> harmonicAmplitudes_; 
 
-    std::mt19937 rng;
-    std::uniform_real_distribution<float> noiseDist;
+    std::mt19937 rng; // Unused currently
+    std::uniform_real_distribution<float> noiseDist; // Unused currently
 
     float pulseWidth;
     float pwmDepth;
@@ -57,6 +60,4 @@ private:
     float wheelModPWValue;
     float driftPWValue;
 
-    // float noiseLevel; // このメンバ変数が .cpp ファイルの setNoiseLevel で使われることを想定
-                        // Voice class has its own noise generator. Removing to avoid confusion.
 };

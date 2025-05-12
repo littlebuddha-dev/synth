@@ -4,7 +4,7 @@
 #include "lfo.h"
 #include "poly_synth.h"
 #include "waveform.h"
-#include "synth_parameters.h" // For SynthParams::FilterType
+#include "synth_parameters.h" 
 #include <cmath>
 #include <iostream>
 #include <memory>
@@ -44,7 +44,7 @@ void resetWheelModAmounts(PolySynth &s) {
 }
 
 void setupBasicSynthSound(PolySynth &s, bool resetWheelAndPolyAndFM = true) {
-  s.setFilterType(SynthParams::FilterType::LPF24); // Default to LPF24
+  s.setFilterType(SynthParams::FilterType::LPF24); 
   s.setWaveform(Waveform::Saw);
   s.setOsc1Level(1.0f);
   s.setOsc2Level(0.0f);
@@ -65,6 +65,9 @@ void setupBasicSynthSound(PolySynth &s, bool resetWheelAndPolyAndFM = true) {
   s.setVCFResonance(0.05f);
   s.setVCFKeyFollow(0.0f);
   s.setVCFEnvelopeAmount(0.5f);
+
+  s.setMixerDrive(0.0f);      
+  s.setMixerPostGain(1.0f);   
 
   EnvelopeParams ampEnvParams = {0.01f, 0.3f, 0.7f, 0.5f};
   s.setAmpEnvelope(ampEnvParams);
@@ -97,8 +100,14 @@ void setupBasicSynthSound(PolySynth &s, bool resetWheelAndPolyAndFM = true) {
   s.setPitchBend(0.0f); 
   s.setPitchBendRange(2.0f); 
 
-  if (mainReverb) {
-    mainReverb->setEnabled(false); 
+  if (mainReverb) { // Ensure mainReverb is not null before using
+    mainReverb->setEnabled(false); // Default reverb to off
+    // Set default reverb parameters that sound reasonable when turned on
+    mainReverb->setDryWetMix(0.3f);
+    mainReverb->setRoomSize(0.5f);
+    mainReverb->setDamping(0.5f);
+    mainReverb->setWetGain(1.0f);
+    mainReverb->setRT60(1.2f);
   }
   
   s.setAnalogPitchDriftDepth(0.0f);
@@ -144,63 +153,115 @@ int main() {
 
   // --- Basic Sound Check ---
   std::cout << "\n--- Basic Sound Check (C4 Saw, LPF24) ---" << std::endl;
-  setupBasicSynthSound(synth);
+  setupBasicSynthSound(synth); // Reverb is OFF by default here
   synth.noteOn(60, 100); 
   Pa_Sleep(1000);
   synth.noteOff(60);
   Pa_Sleep(1000);
 
+  // --- Mixer Overdrive Test ---
+  std::cout << "\n--- Mixer Overdrive Test (Sine Wave C3) ---" << std::endl;
+  setupBasicSynthSound(synth);
+  synth.setWaveform(Waveform::Sine);
+  synth.setOsc1Level(0.7f); 
+  synth.setVCFBaseCutoff(20000.0f); 
+  synth.setVCFEnvelopeAmount(0.0f); 
+
+  std::cout << "Mixer Drive: 0.0 (Clean Sine)" << std::endl;
+  synth.setMixerDrive(0.0f);
+  synth.setMixerPostGain(1.0f); 
+  synth.noteOn(48, 120); 
+  Pa_Sleep(1500);
+  synth.noteOff(48);
+  Pa_Sleep(500);
+
+  std::cout << "Mixer Drive: 0.7 (Medium Drive)" << std::endl;
+  synth.setMixerDrive(0.7f);
+  synth.setMixerPostGain(0.5f); 
+  synth.noteOn(48, 120);
+  Pa_Sleep(1500);
+  synth.noteOff(48);
+  Pa_Sleep(1000);
+  
   // --- Filter Type Tests ---
   std::cout << "\n--- Filter Type Tests (Saw wave, sweeping cutoff with ENV) ---" << std::endl;
   SynthParams::FilterType typesToTest[] = {
-      SynthParams::FilterType::LPF24,
-      SynthParams::FilterType::LPF12,
-      SynthParams::FilterType::HPF12,
-      SynthParams::FilterType::BPF12,
+      SynthParams::FilterType::LPF24, SynthParams::FilterType::LPF12,
+      SynthParams::FilterType::HPF12, SynthParams::FilterType::BPF12,
       SynthParams::FilterType::NOTCH
   };
   const char* typeNames[] = {"LPF24", "LPF12", "HPF12", "BPF12", "NOTCH"};
-
   for (int i = 0; i < 5; ++i) {
       std::cout << "Testing Filter Type: " << typeNames[i] << std::endl;
-      setupBasicSynthSound(synth);
+      setupBasicSynthSound(synth); 
       synth.setFilterType(typesToTest[i]);
       synth.setWaveform(Waveform::Saw);
-      synth.setOsc1Level(1.0f);
-      synth.setVCFBaseCutoff(typesToTest[i] == SynthParams::FilterType::HPF12 ? 100.0f : 8000.0f); // HPF needs low base to sweep up
-      synth.setVCFResonance(0.4f); // Moderate resonance to hear character
-      synth.setVCFEnvelopeAmount(typesToTest[i] == SynthParams::FilterType::HPF12 ? -0.7f : 0.7f); // HPF sweep down (effectively opening)
+      synth.setOsc1Level(0.5f); // Lowered level a bit for filter tests
+      synth.setVCFBaseCutoff(typesToTest[i] == SynthParams::FilterType::HPF12 ? 100.0f : 8000.0f); 
+      synth.setVCFResonance(0.4f); 
+      synth.setVCFEnvelopeAmount(typesToTest[i] == SynthParams::FilterType::HPF12 ? -0.7f : 0.7f); 
       EnvelopeParams filterEnvSweep = {0.1f, 1.0f, 0.0f, 0.5f};
       synth.setFilterEnvelope(filterEnvSweep);
-      
-      synth.noteOn(48, 110); // C3
+      synth.noteOn(48, 110); 
       Pa_Sleep(2500);
       synth.noteOff(48);
       Pa_Sleep(1000);
   }
-  // --- End Filter Type Tests ---
-
-
-  // --- Cross Modulation (FM) Test (Remains largely unchanged but uses LPF24 default) ---
-  std::cout << "\n--- Cross Modulation (FM) Test ---" << std::endl;
-  setupBasicSynthSound(synth); // This will set LPF24 by default
-  synth.setWaveform(Waveform::Sine); 
-  synth.setOsc1Level(1.0f);
-  synth.setOsc2Level(0.0f); 
-  synth.setVCOBKeyFollowEnabled(true); 
-  synth.setVCOBFreqKnob(0.5f + (7.0f / 60.0f)); 
   
-  std::cout << "Test 1: Osc2 -> Osc1 FM (gentle, harmonic)" << std::endl;
-  synth.setXModOsc2ToOsc1FMAmount(0.15f); 
-  synth.setXModOsc1ToOsc2FMAmount(0.0f);
-  synth.noteOn(48, 100); 
-  Pa_Sleep(2000);
-  synth.noteOff(48);
-  Pa_Sleep(500);
+  // --- Reverb Tests ---
+  std::cout << "\n--- Reverb Tests (Short Sawtooth Note C4) ---" << std::endl;
+  setupBasicSynthSound(synth); // Reverb is off, basic sound
+  synth.setWaveform(Waveform::Saw);
+  synth.setOsc1Level(0.6f);
+  EnvelopeParams shortAmpEnv = {0.01f, 0.1f, 0.0f, 0.2f}; // Short staccato note
+  synth.setAmpEnvelope(shortAmpEnv);
 
+  std::cout << "Reverb OFF" << std::endl;
+  if(mainReverb) mainReverb->setEnabled(false);
+  synth.noteOn(60, 127); Pa_Sleep(500); synth.noteOff(60); Pa_Sleep(1000);
 
-  // (Keep other tests like Moog Bass, SuperSaw, Additive, RingMod, PitchBend as they were,
-  //  they will now use LPF24 by default from setupBasicSynthSound)
+  if(mainReverb) { // Only proceed if reverb exists
+    std::cout << "Reverb ON (Default values)" << std::endl;
+    mainReverb->setEnabled(true);
+    mainReverb->setDryWetMix(0.3f); mainReverb->setRoomSize(0.5f); mainReverb->setDamping(0.5f);
+    mainReverb->setWetGain(1.0f); mainReverb->setRT60(1.2f);
+    synth.noteOn(60, 127); Pa_Sleep(500); synth.noteOff(60); Pa_Sleep(2000);
+
+    std::cout << "Reverb - Short RT60 (0.3s)" << std::endl;
+    mainReverb->setRT60(0.3f);
+    synth.noteOn(60, 127); Pa_Sleep(500); synth.noteOff(60); Pa_Sleep(1500);
+
+    std::cout << "Reverb - Long RT60 (3.5s)" << std::endl;
+    mainReverb->setRT60(3.5f);
+    synth.noteOn(60, 127); Pa_Sleep(500); synth.noteOff(60); Pa_Sleep(4000);
+    mainReverb->setRT60(1.2f); // Reset
+
+    std::cout << "Reverb - Small RoomSize (0.1)" << std::endl;
+    mainReverb->setRoomSize(0.1f);
+    synth.noteOn(60, 127); Pa_Sleep(500); synth.noteOff(60); Pa_Sleep(2000);
+
+    std::cout << "Reverb - Large RoomSize (0.9)" << std::endl;
+    mainReverb->setRoomSize(0.9f);
+    synth.noteOn(60, 127); Pa_Sleep(500); synth.noteOff(60); Pa_Sleep(2000);
+    mainReverb->setRoomSize(0.5f); // Reset
+
+    std::cout << "Reverb - Low Damping (0.1 - bright)" << std::endl;
+    mainReverb->setDamping(0.1f);
+    synth.noteOn(60, 127); Pa_Sleep(500); synth.noteOff(60); Pa_Sleep(2000);
+
+    std::cout << "Reverb - High Damping (0.9 - dark)" << std::endl;
+    mainReverb->setDamping(0.9f);
+    synth.noteOn(60, 127); Pa_Sleep(500); synth.noteOff(60); Pa_Sleep(2000);
+    mainReverb->setDamping(0.5f); // Reset
+
+    std::cout << "Reverb - High Dry/Wet (0.7)" << std::endl;
+    mainReverb->setDryWetMix(0.7f);
+    synth.noteOn(60, 127); Pa_Sleep(500); synth.noteOff(60); Pa_Sleep(2000);
+    mainReverb->setDryWetMix(0.3f); // Reset
+
+    mainReverb->setEnabled(false); // Turn off reverb for subsequent tests
+  }
+  // --- End Reverb Tests ---
 
 
   std::cout << "Stopping synth..." << std::endl;

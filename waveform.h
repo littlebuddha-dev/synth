@@ -7,5 +7,5 @@ enum class Waveform {
     Square,
     Triangle,
     Pulse,
-    Additive // New waveform type for harmonic control
+    Additive 
 };

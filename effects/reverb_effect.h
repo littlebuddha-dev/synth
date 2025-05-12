@@ -1,36 +1,32 @@
 // synth/effects/reverb_effect.h
 #pragma once
 #include "audio_effect.h"
-#include <algorithm> // For std::clamp
+#include <algorithm> 
 #include <cmath>
 #include <vector>
 
-// Forward declaration for internal filter classes if complex
-// For simplicity, basic filter logic can be within ReverbEffect or simple
-// helper structs
-
-
 class ReverbEffect : public AudioEffect {
 private:
-  // Simple internal comb filter
   class CombFilter {
   public:
-    CombFilter(int sr, float delayMs, float feedback, float damping);
+    CombFilter(int sr, float delayMs, float initialFeedback, float dampingCutoffHz);
     float process(float input);
     void setDelay(float delayMs);
+    float getDelayMs() const; 
     void setFeedback(float fb);
-    void setDamping(float damp); // 0 (no damp) to 1 (full damp)
+    void setDampingCutoff(float cutoffHz); 
+
   private:
-    int sampleRate;
-    std::vector<float> buffer;
-    int bufferSize;
-    int writePos;
-    float currentFeedback;
-    float currentDamping; // filter coefficient for LPF in feedback loop
-    float filterStore;    // previous filtered value
+    int sampleRate_;
+    std::vector<float> buffer_;
+    int bufferSize_;
+    int writePos_;
+    float currentFeedback_;
+    float dampingAlpha_; 
+    float filterStore_;    
+    float delayMs_; 
   };
 
-  // Simple internal all-pass filter
   class AllPassFilter {
   public:
     AllPassFilter(int sr, float delayMs, float feedback);
@@ -39,54 +35,58 @@ private:
     void setFeedback(float fb);
 
   private:
-    int sampleRate;
-    std::vector<float> buffer;
-    int bufferSize;
-    int writePos;
-    float currentFeedback;
+    int sampleRate_;
+    std::vector<float> buffer_;
+    int bufferSize_;
+    int writePos_;
+    float currentFeedback_;
   };
 
-  std::vector<CombFilter> combFiltersL; // Left channel comb filters
-  std::vector<CombFilter> combFiltersR; // Right channel comb filters
-  std::vector<AllPassFilter> allPassFiltersL; // Left channel all-pass filters
-  std::vector<AllPassFilter> allPassFiltersR; // Right channel all-pass filters
-
-
-  float dryWetMix;
-  float roomSize; // Affects delay times
-  float damping;  // Affects comb filter damping
-
-  // Tuned delay times for comb and all-pass filters (in milliseconds)
-  // These are just example values and would need careful tuning
-  // For stereo, provide slightly different times for L/R
-  const std::vector<float> baseCombDelayTimesL = {29.7f, 37.1f, 41.1f, 43.7f}; 
-  const std::vector<float> baseCombDelayTimesR = {30.1f, 38.3f, 41.9f, 44.3f}; // Slightly offset
-  const std::vector<float> baseAllPassDelayTimesL = {5.0f, 1.7f}; 
-  const std::vector<float> baseAllPassDelayTimesR = {5.3f, 1.9f}; // Slightly offset
+  const std::vector<float> baseCombDelayTimesL = {
+      29.7f, 37.1f, 41.1f, 43.7f, 53.3f, 61.3f, 67.7f, 73.3f 
+  }; 
+  const std::vector<float> baseCombDelayTimesR = { 
+      30.1f, 38.3f, 41.9f, 44.3f, 54.7f, 62.1f, 68.1f, 74.1f
+  }; 
+  const std::vector<float> baseAllPassDelayTimesL = {5.0f, 1.7f, 6.1f, 2.3f}; 
+  const std::vector<float> baseAllPassDelayTimesR = {5.3f, 1.9f, 6.3f, 2.5f};
   
-  const std::vector<float> baseCombFeedbacks = {0.80f, 0.78f, 0.75f, 0.72f}; 
-  const std::vector<float> baseAllPassFeedbacks = {0.5f, 0.5f}; 
+  const std::vector<float> baseAllPassFeedbacks = {0.5f, 0.5f, 0.5f, 0.5f}; 
+
+  std::vector<CombFilter> combFiltersL; 
+  std::vector<CombFilter> combFiltersR; 
+  std::vector<AllPassFilter> allPassFiltersL; 
+  std::vector<AllPassFilter> allPassFiltersR; 
+
+
+  float dryWetMix_;     
+  float roomSize_;      
+  float dampingParam_;  
+  float rt60_;          
+  float wetGain_;       
 
 public:
   ReverbEffect(float sr);
   ~ReverbEffect() override = default;
 
-  // This mono version could be deprecated or call the stereo version with L=R
-  // float processSample(float inputSample) override; 
   void processStereoSample(float inL, float inR, float &outL, float &outR) override;
 
+  void setDryWetMix(float mix); 
+  float getDryWetMix() const { return dryWetMix_; }
 
-  void setDryWetMix(float mix); // 0.0 (dry) to 1.0 (wet)
-  void setRoomSize(float size); // 0.0 to 1.0
-  void setDamping(float damp);  // 0.0 to 1.0
+  void setRoomSize(float size); 
+  float getRoomSize() const { return roomSize_; }
   
-  float wetGain = 1.0f;  // デフォルト 100%
+  void setDamping(float dampParam); 
+  float getDamping() const { return dampingParam_; }
+  
   void setWetGain(float gain);
+  float getWetGain() const { return wetGain_; }
   
-  float rt60 = 1.2f; // デフォルト残響時間（秒）
   void setRT60(float seconds);
-
+  float getRT60() const { return rt60_; }
 
 private:
   void updateParameters();
+  float calculateDampingCutoffHz(float dampingParamValue); 
 };

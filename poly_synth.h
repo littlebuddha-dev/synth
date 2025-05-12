@@ -2,9 +2,9 @@
 #pragma once
 #include "envelope.h" 
 #include "lfo.h"      
-#include "voice.h" // Voice uses SynthParams::FilterType
+#include "voice.h" 
 #include "waveform.h" 
-#include "synth_parameters.h" // For SynthParams::FilterType
+#include "synth_parameters.h" 
 #include <memory>     
 #include <vector>
 #include <utility> 
@@ -59,8 +59,7 @@ public:
   void setPMOscBToPWAAmount(float amount);
   void setPMOscBToFilterCutoffAmount(float amount);
 
-  // Filter Parameters 
-  void setFilterType(SynthParams::FilterType type); // New
+  void setFilterType(SynthParams::FilterType type); 
   void setVCFBaseCutoff(float hz);
   void setVCFResonance(float q);
   void setVCFKeyFollow(float f);
@@ -99,11 +98,16 @@ public:
 
   void addEffect(std::unique_ptr<AudioEffect> effect);
   void clearEffects();
+  AudioEffect* getEffect(size_t index); // To get reverb for parameter setting
+
 
   void setAnalogPitchDriftDepth(float cents); 
   void setAnalogPWDriftDepth(float depth);    
 
   void setOscHarmonicAmplitude(int oscNum, int harmonicIndex, float amplitude); 
+
+  void setMixerDrive(float drive);
+  void setMixerPostGain(float gain);
 
 private:
   std::vector<Voice> voices;

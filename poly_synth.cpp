@@ -1,9 +1,9 @@
 // synth/poly_synth.cpp
 #include "poly_synth.h"
 #include "effects/audio_effect.h" 
-#include "voice.h" // Voice uses SynthParams::FilterType
+#include "voice.h" 
 #include "waveform.h"
-#include "synth_parameters.h" // For SynthParams::FilterType
+#include "synth_parameters.h" 
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -334,7 +334,6 @@ void PolySynth::setPMOscBToFilterCutoffAmount(float amount) {
     voice.setPMOscBToFilterCutoffAmount(amount);
 }
 
-// Filter methods
 void PolySynth::setFilterType(SynthParams::FilterType type) {
     for (auto &voice : voices) {
         voice.setFilterType(type);
@@ -468,6 +467,14 @@ void PolySynth::addEffect(std::unique_ptr<AudioEffect> effect) {
 
 void PolySynth::clearEffects() { effectsChain.clear(); }
 
+AudioEffect* PolySynth::getEffect(size_t index) {
+    if (index < effectsChain.size()) {
+        return effectsChain[index].get();
+    }
+    return nullptr;
+}
+
+
 void PolySynth::setAnalogPitchDriftDepth(float cents) {
     analogPitchDriftDepth_ = std::max(0.0f, cents); 
     for (auto& voice : voices) {
@@ -494,5 +501,17 @@ void PolySynth::setOscHarmonicAmplitude(int oscNum, int harmonicIndex, float amp
         } else if (oscNum == 2) {
             voice.setOsc2HarmonicAmplitude(harmonicIndex, amplitude);
         }
+    }
+}
+
+void PolySynth::setMixerDrive(float drive) {
+    for (auto& voice : voices) {
+        voice.setMixerDrive(drive);
+    }
+}
+
+void PolySynth::setMixerPostGain(float gain) {
+    for (auto& voice : voices) {
+        voice.setMixerPostGain(gain);
     }
 }

@@ -21,7 +21,7 @@ Voice::Voice(int sampleRate_, int numHarmonics)
           Envelope(0.01f, 0.1f, 0.7f, 0.3f, sampleRate_), 
           Envelope(0.01f, 0.1f, 0.9f, 0.2f, sampleRate_)  
       },
-      filter(sampleRate_), // VCF now handles its own type, default LPF24
+      filter(sampleRate_), 
       noteOnTimestamp(0),
       lastS1OutputForFM_(0.0f), 
       vcoBDetuneCents(0.0f),
@@ -50,8 +50,9 @@ Voice::Voice(int sampleRate_, int numHarmonics)
       , pwDriftDepth(0.0f)
       , ringModLevel_(0.0f)
       , panning_(0.0f)
+      , mixerDrive_(0.0f)
+      , mixerPostGain_(1.0f)
 { 
-    // Default filter type is LPF24, set by VCF constructor
 }
 
 void Voice::noteOn(float freq, float velocity, int midiNoteNum, bool globalGlideEnabled, float globalGlideTimeSeconds) {
@@ -77,7 +78,7 @@ void Voice::noteOnDetailed(float newTargetFrequency, float normVelocity, int mid
     osc2.resetPhase(); 
     envelopes[0].noteOn(); 
     envelopes[1].noteOn(); 
-    filter.setNote(noteNumber); // VCF needs note for keyfollow
+    filter.setNote(noteNumber); 
 
     float freqToGlideFrom = this->currentOutputFreq; 
 
@@ -194,14 +195,14 @@ float Voice::process(const LfoModulationValues& lfoMod, float currentPitchBendVa
     if (std::abs(xmodOsc2ToOsc1FMAmount_) > 0.001f) { 
         osc1_final_freq = baseFreqOsc1BeforeFM * std::pow(2.0f, s2_output * xmodOsc2ToOsc1FMAmount_ * FM_OCTAVE_RANGE);
     }
+    osc1.setFrequency(std::max(0.0f, osc1_final_freq)); 
+    osc1.setDriftPWValue(osc1_pw_drift_offset); 
+
     float filterEnv_pwm_mod_scaled = (filterEnvOutput - 0.5f) * 2.0f; 
     float vco1_pm_env_pw_effect = filterEnv_pwm_mod_scaled * pm_filterEnv_to_pwA_amt * 0.5f;
     float vco1_pm_oscB_pw_effect = s2_output * pm_oscB_to_pwA_amt * 0.5f; 
     osc1.setPolyModPWValue(vco1_pm_env_pw_effect + vco1_pm_oscB_pw_effect); 
     
-    osc1.setFrequency(std::max(0.0f, osc1_final_freq)); 
-    osc1.setDriftPWValue(osc1_pw_drift_offset); 
-
     if (syncEnabled && s2_output > 0.0f && lastOsc2 <= 0.0f) { 
         osc1.sync();
     }
@@ -212,7 +213,17 @@ float Voice::process(const LfoModulationValues& lfoMod, float currentPitchBendVa
 
     float noise = distribution(generator);
     float ringModOutput = s1_output * s2_output * ringModLevel_;
-    float mixed = (osc1Level * s1_output + osc2Level * s2_output + noiseLevel * noise + ringModOutput);
+    float mixed_pre_drive = (osc1Level * s1_output + osc2Level * s2_output + noiseLevel * noise + ringModOutput);
+
+    float mixed_signal_after_drive;
+    if (mixerDrive_ <= 0.001f) { 
+        mixed_signal_after_drive = mixed_pre_drive; 
+    } else {
+        float input_gain = 1.0f + mixerDrive_ * Voice::MAX_DRIVE_BOOST;
+        mixed_signal_after_drive = std::tanh(mixed_pre_drive * input_gain);
+    }
+    float mixed = mixed_signal_after_drive * mixerPostGain_;
+
 
     float vcfLfoModOffset = lfoMod.vcfCutoffMod; 
     float pm_env_to_vcf_hz_offset = ((filterEnvOutput - 0.5f) * 2.0f) * pm_filterEnv_to_filterCutoff_amt * 2000.0f;
@@ -299,7 +310,6 @@ void Voice::setPMOscBToFilterCutoffAmount(float amount) {
     pm_oscB_to_filterCutoff_amt = std::clamp(amount, 0.0f, 1.0f);
 }
 
-// Filter methods
 void Voice::setFilterType(SynthParams::FilterType type) {
     filter.setType(type);
 }
@@ -346,4 +356,12 @@ void Voice::setPanning(float pan) {
 
 float Voice::getPanning() const {
     return panning_;
+}
+
+void Voice::setMixerDrive(float drive) {
+    mixerDrive_ = std::clamp(drive, 0.0f, 1.0f);
+}
+
+void Voice::setMixerPostGain(float gain) {
+    mixerPostGain_ = std::max(0.0f, gain); 
 }

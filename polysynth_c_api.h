@@ -45,13 +45,15 @@ void ps_set_osc2_level(PolySynthHandle handle, float level);
 void ps_set_noise_level(PolySynthHandle handle, float level);
 void ps_set_ring_mod_level(PolySynthHandle handle, float level); 
 
-// Filter C API
-void ps_set_filter_type(PolySynthHandle handle, SynthParams::PS_FilterType type_c); // New
+void ps_set_filter_type(PolySynthHandle handle, SynthParams::PS_FilterType type_c); 
 void ps_set_vcf_base_cutoff(PolySynthHandle handle, float hz); 
 void ps_set_vcf_resonance(PolySynthHandle handle, float q);   
 
 void ps_set_xmod_osc2_to_osc1_fm_amount(PolySynthHandle handle, float amount);
 void ps_set_xmod_osc1_to_osc2_fm_amount(PolySynthHandle handle, float amount);
+
+void ps_set_mixer_drive(PolySynthHandle handle, float drive);
+void ps_set_mixer_post_gain(PolySynthHandle handle, float gain);
 
 
 typedef struct {
@@ -68,6 +70,14 @@ void ps_set_unison_detune_cents(PolySynthHandle handle, float cents);
 void ps_set_unison_stereo_spread(PolySynthHandle handle, float spread);
 
 void ps_set_osc_harmonic_amplitude(PolySynthHandle handle, int osc_num, int harmonic_index, float amplitude);
+
+// Reverb specific C API (could also be part of ps_set_float_param with C_PARAM_REVERB_... IDs)
+void ps_reverb_set_enabled(PolySynthHandle handle, int effect_index, int enabled);
+void ps_reverb_set_dry_wet_mix(PolySynthHandle handle, int effect_index, float mix);
+void ps_reverb_set_room_size(PolySynthHandle handle, int effect_index, float size);
+void ps_reverb_set_damping(PolySynthHandle handle, int effect_index, float damping);
+void ps_reverb_set_wet_gain(PolySynthHandle handle, int effect_index, float gain);
+void ps_reverb_set_rt60(PolySynthHandle handle, int effect_index, float rt60);
 
 
 #ifdef __cplusplus

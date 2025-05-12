@@ -2,17 +2,15 @@
 
 namespace SynthParams {
 
-// New: FilterType enum
 enum class FilterType {
-    LPF24, // Ladder Low Pass 24dB/oct (existing)
-    LPF12, // SVF Low Pass 12dB/oct
-    HPF12, // SVF High Pass 12dB/oct
-    BPF12, // SVF Band Pass 12dB/oct
-    NOTCH  // SVF Notch (Band Reject)
+    LPF24, 
+    LPF12, 
+    HPF12, 
+    BPF12, 
+    NOTCH  
 };
 
 enum class ParamID {
-    // Global Voice Parameters
     MasterTuneCents,
     Waveform, 
     Osc1Level,
@@ -37,12 +35,14 @@ enum class ParamID {
     PMOscBToPWAAmount,
     PMOscBToFilterCutoffAmount,
 
-    // Filter Parameters
-    FilterType, // New: To select filter type
+    FilterType, 
     VCFBaseCutoff,
     VCFResonance,
     VCFKeyFollow,
     VCFEnvelopeAmount,
+
+    MixerDrive,       
+    MixerPostGain,    
 
     AmpEnvAttack,
     AmpEnvDecay,
@@ -79,6 +79,7 @@ enum class ParamID {
     AnalogPitchDriftDepth,
     AnalogPWDriftDepth,
 
+    // Reverb Parameters (can also be addressed via effect-specific API)
     ReverbEnabled,
     ReverbDryWetMix,
     ReverbRoomSize,
@@ -115,12 +116,14 @@ enum C_ParamID {
     C_PARAM_PM_OSCB_TO_PW_A_AMOUNT,
     C_PARAM_PM_OSCB_TO_FILTER_CUTOFF_AMOUNT,
 
-    // Filter Parameters
-    C_PARAM_FILTER_TYPE, // New
+    C_PARAM_FILTER_TYPE, 
     C_PARAM_VCF_BASE_CUTOFF,
     C_PARAM_VCF_RESONANCE,
     C_PARAM_VCF_KEY_FOLLOW,
     C_PARAM_VCF_ENVELOPE_AMOUNT,
+
+    C_PARAM_MIXER_DRIVE,        
+    C_PARAM_MIXER_POST_GAIN,    
 
     C_PARAM_AMP_ENV_ATTACK,
     C_PARAM_AMP_ENV_DECAY,
@@ -167,7 +170,6 @@ enum C_ParamID {
     C_PARAM_NUM_PARAMETERS
 };
 
-// C API用 FilterType enum
 typedef enum {
     PS_FILTER_TYPE_LPF24 = 0,
     PS_FILTER_TYPE_LPF12,

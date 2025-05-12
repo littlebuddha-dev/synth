@@ -3,19 +3,20 @@
 
 #include "harmonic_osc.h"
 #include "waveform.h"
-#include "vcf.h"
+#include "vcf.h" // VCF uses SynthParams::FilterType now
 #include "envelope.h"
 #include "lfo.h"
 #include "analog_drift.h" 
+#include "synth_parameters.h" // For SynthParams::FilterType
 
 struct LfoModulationValues {
-    float osc1FreqMod = 0.0f; // Semitones from LFO & Wheel
-    float osc2FreqMod = 0.0f; // Semitones from LFO & Wheel
+    float osc1FreqMod = 0.0f; 
+    float osc2FreqMod = 0.0f; 
     float osc1PwMod = 0.0f;
     float osc2PwMod = 0.0f;
     float wheelOsc1PwOffset = 0.0f; 
     float wheelOsc2PwOffset = 0.0f; 
-    float vcfCutoffMod = 0.0f;  // Hz offset from LFO & Wheel
+    float vcfCutoffMod = 0.0f;  
 };
 
 
@@ -35,6 +36,7 @@ private:
     float ringModLevel_ = 0.0f; 
 
     float lastOsc2 = 0.0f;
+    float lastS1OutputForFM_ = 0.0f; 
 
     float vcoBDetuneCents = 0.0f;
     bool vcoBLowFreqEnabled = false;
@@ -47,20 +49,23 @@ private:
     float filterEnvVelocitySensitivity = 0.0f;
     float ampVelocitySensitivity = 0.0f;
 
+    float xmodOsc2ToOsc1FMAmount_ = 0.0f; 
+    float xmodOsc1ToOsc2FMAmount_ = 0.0f; 
+
     float pm_filterEnv_to_freqA_amt = 0.0f;
     float pm_filterEnv_to_pwA_amt = 0.0f;
     float pm_filterEnv_to_filterCutoff_amt = 0.0f;
-    float pm_oscB_to_freqA_amt = 0.0f;
     float pm_oscB_to_pwA_amt = 0.0f;
     float pm_oscB_to_filterCutoff_amt = 0.0f;
 
-
     VCF filter;
+    // SynthParams::FilterType currentVoiceFilterType_; // No, VCF handles its own type
+
     Envelope envelopes[2];
 
     unsigned long long noteOnTimestamp = 0;
 
-    float currentOutputFreq;             // Current glided, *unbent* frequency of the note
+    float currentOutputFreq;             
     float targetKeyFreq;                 
     float glideStartFreqForCurrentSegment; 
     float glideLogStep;                    
@@ -69,7 +74,6 @@ private:
     bool isGliding;
     bool firstNoteForThisVoiceInstance;    
 
-    // Analog Drift
     AnalogDrift analogDriftPitch1;
     AnalogDrift analogDriftPitch2;
     AnalogDrift analogDriftPW1;
@@ -77,7 +81,7 @@ private:
     float pitchDriftDepthCents; 
     float pwDriftDepth;         
 
-    float panning_ = 0.0f; // -1.0 (L) to 1.0 (R)
+    float panning_ = 0.0f; 
 
     void noteOnDetailed(float newTargetFrequency, float normalizedVelocity, int midiNoteNum, bool useGlide, float glideTimeSec);
 
@@ -88,7 +92,6 @@ public:
     void noteOn(float freq, float velocity, int midiNoteNum, bool globalGlideEnabled, float globalGlideTimeSeconds);
     
     void noteOff();
-    // Modified process method to accept pitch bend parameters
     float process(const LfoModulationValues& lfoMod, float currentPitchBendValue, float pitchBendRangeInSemitones);
     bool isActive() const;
     
@@ -122,13 +125,17 @@ public:
     void setFilterEnvVelocitySensitivity(float amount); 
     void setAmpVelocitySensitivity(float amount);       
 
+    void setXModOsc2ToOsc1FMAmount(float amount);
+    void setXModOsc1ToOsc2FMAmount(float amount);
+
     void setPMFilterEnvToFreqAAmount(float amount);
     void setPMFilterEnvToPWAAmount(float amount);
     void setPMFilterEnvToFilterCutoffAmount(float amount);
-    void setPMOscBToFreqAAmount(float amount);
     void setPMOscBToPWAAmount(float amount);
     void setPMOscBToFilterCutoffAmount(float amount);
 
+    // Filter methods
+    void setFilterType(SynthParams::FilterType type); // New
     void setVCFResonance(float q);
     void setVCFKeyFollow(float f);
     void setVCFEnvelopeAmount(float amt);
@@ -143,6 +150,6 @@ public:
     void setOsc1HarmonicAmplitude(int harmonicIndex, float amplitude); 
     void setOsc2HarmonicAmplitude(int harmonicIndex, float amplitude); 
 
-    void setPanning(float pan); // -1.0 (L) to 1.0 (R)
+    void setPanning(float pan); 
     float getPanning() const;
 };

@@ -1,14 +1,14 @@
 // synth/poly_synth.h
 #pragma once
-#include "envelope.h" // For EnvelopeParams
-#include "lfo.h"      // For LFO class and LfoWaveform enum
-#include "voice.h"
-#include "waveform.h" // For Waveform enum
-#include <memory>     // For std::unique_ptr
+#include "envelope.h" 
+#include "lfo.h"      
+#include "voice.h" // Voice uses SynthParams::FilterType
+#include "waveform.h" 
+#include "synth_parameters.h" // For SynthParams::FilterType
+#include <memory>     
 #include <vector>
-#include <utility> // For std::pair
+#include <utility> 
 
-// LFO Destinations
 enum class LfoDestination {
   None = 0,
   VCO1_Freq = 1,
@@ -16,13 +16,12 @@ enum class LfoDestination {
   VCO1_PW = 3,
   VCO2_PW = 4,
   VCF_Cutoff = 5,
-  NumDestinations // Keep last for array sizing
+  NumDestinations 
 };
 
-// Wheel Modulation Source
 enum class WheelModSource { LFO, NOISE };
 
-class AudioEffect; // Forward declaration
+class AudioEffect; 
 
 struct StereoSample {
     float L = 0.0f;
@@ -34,44 +33,42 @@ public:
   PolySynth(int sampleRate = 44100, int maxVoices = 16);
   void noteOn(int midiNote, float velocity);
   void noteOff(int midiNote);
-  StereoSample process(); // Generates one stereo sample pair
+  StereoSample process(); 
 
-  // Global Voice Parameters
-  void setWaveform(Waveform wf); // Sets for both OSCs in all voices
+  void setWaveform(Waveform wf); 
   void setOsc1Level(float);
   void setOsc2Level(float);
-  void setNoiseLevel(float level);      // Global noise level for all voices
-  void setRingModLevel(float level);    // Global ring mod level for all voices
-  void setVCOBDetuneCents(float cents); // For VCO B fine tune
+  void setNoiseLevel(float level);      
+  void setRingModLevel(float level);    
+  void setVCOBDetuneCents(float cents); 
   void setSyncEnabled(bool enabled);
   void setVCOBLowFreqEnabled(bool enabled);
-  void setVCOBFreqKnob(float value); // 0.0 to 1.0
+  void setVCOBFreqKnob(float value); 
   void setVCOBKeyFollowEnabled(bool enabled); 
   void setFilterEnvVelocitySensitivity(float amount);
   void setAmpVelocitySensitivity(float amount);
-  void setPulseWidth(float width); // Base PW for both OSCs
-  void setPWMDepth(
-      float depth); 
+  void setPulseWidth(float width); 
+  void setPWMDepth(float depth); 
 
-  // PolyMod Parameters
+  void setXModOsc2ToOsc1FMAmount(float amount);
+  void setXModOsc1ToOsc2FMAmount(float amount);
+
   void setPMFilterEnvToFreqAAmount(float amount);
   void setPMFilterEnvToPWAAmount(float amount);
   void setPMFilterEnvToFilterCutoffAmount(float amount);
-  void setPMOscBToFreqAAmount(float amount);
   void setPMOscBToPWAAmount(float amount);
   void setPMOscBToFilterCutoffAmount(float amount);
 
-  // Filter Parameters (Global for all voices)
+  // Filter Parameters 
+  void setFilterType(SynthParams::FilterType type); // New
   void setVCFBaseCutoff(float hz);
   void setVCFResonance(float q);
   void setVCFKeyFollow(float f);
   void setVCFEnvelopeAmount(float amt);
 
-  // Envelope Parameters (Global for all voices)
   void setAmpEnvelope(const EnvelopeParams &);
   void setFilterEnvelope(const EnvelopeParams &);
 
-  // LFO Parameters
   void setLfoRate(float rateHz);
   void setLfoWaveform(LfoWaveform wf);
   void setLfoAmountToVco1Freq(float semitones); 
@@ -80,7 +77,6 @@ public:
   void setLfoAmountToVco2Pw(float normalizedAmount);
   void setLfoAmountToVcfCutoff(float hzOffset); 
 
-  // Wheel Modulation Settings
   void setModulationWheelValue(float value); 
   void setWheelModSource(WheelModSource source);
   void setWheelModAmountToFreqA(float amount);  
@@ -89,32 +85,25 @@ public:
   void setWheelModAmountToPWB(float amount);    
   void setWheelModAmountToFilter(float amount); 
 
-  // Unison Settings
   void setUnisonEnabled(bool enabled);
   void setUnisonDetuneCents(float cents);
-  void setUnisonStereoSpread(float spread); // 0.0 (mono) to 1.0 (max spread)
+  void setUnisonStereoSpread(float spread); 
 
-  // Glide/Portamento Settings
   void setGlideEnabled(bool enabled);
   void setGlideTime(float timeSeconds); 
 
-  // Master Tune Setting
   void setMasterTuneCents(float cents);
 
-  // Pitch Bend Settings
-  void setPitchBend(float value); // -1.0 to 1.0
-  void setPitchBendRange(float semitones); // e.g., 2.0 for +/- 2 semitones
+  void setPitchBend(float value); 
+  void setPitchBendRange(float semitones); 
 
-  // Effects Management
   void addEffect(std::unique_ptr<AudioEffect> effect);
   void clearEffects();
 
-  // Analog Drift Parameters
   void setAnalogPitchDriftDepth(float cents); 
   void setAnalogPWDriftDepth(float depth);    
 
-  // Harmonic Amplitude Parameters (for Additive waveform)
-  void setOscHarmonicAmplitude(int oscNum, int harmonicIndex, float amplitude); // harmonicIndex is 0-based
+  void setOscHarmonicAmplitude(int oscNum, int harmonicIndex, float amplitude); 
 
 private:
   std::vector<Voice> voices;
@@ -150,8 +139,8 @@ private:
 
   float masterTuneCents = 0.0f; 
 
-  float pitchBendValue_; // -1.0 to 1.0, center is 0.0
-  float pitchBendRangeSemitones_; // Default +/- 2 semitones
+  float pitchBendValue_; 
+  float pitchBendRangeSemitones_; 
 
   std::vector<std::unique_ptr<AudioEffect>> effectsChain;
 

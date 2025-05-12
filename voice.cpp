@@ -3,11 +3,14 @@
 #include <cmath>
 #include "envelope.h" 
 #include <random>
-#include <iostream> // For std::cout in debug, remove in production
-#include <algorithm> // For std::clamp
+#include <iostream> 
+#include <algorithm> 
 
-std::default_random_engine generator; // Should this be per-voice or global? Global for now.
+std::default_random_engine generator; 
 std::uniform_real_distribution<float> distribution(-1.0f, 1.0f); 
+
+constexpr float FM_OCTAVE_RANGE = 5.0f;
+
 
 Voice::Voice(int sampleRate_, int numHarmonics)
     : sampleRate(sampleRate_), active(false),
@@ -18,8 +21,9 @@ Voice::Voice(int sampleRate_, int numHarmonics)
           Envelope(0.01f, 0.1f, 0.7f, 0.3f, sampleRate_), 
           Envelope(0.01f, 0.1f, 0.9f, 0.2f, sampleRate_)  
       },
-      filter(sampleRate_),
+      filter(sampleRate_), // VCF now handles its own type, default LPF24
       noteOnTimestamp(0),
+      lastS1OutputForFM_(0.0f), 
       vcoBDetuneCents(0.0f),
       vcoBLowFreqEnabled(false),
       vcoBFreqKnob(0.5f),
@@ -27,13 +31,14 @@ Voice::Voice(int sampleRate_, int numHarmonics)
       vcoBFixedBaseFreq_(-1.0f),        
       filterEnvVelocitySensitivity(0.0f),
       ampVelocitySensitivity(0.0f),
+      xmodOsc2ToOsc1FMAmount_(0.0f), 
+      xmodOsc1ToOsc2FMAmount_(0.0f), 
       pm_filterEnv_to_freqA_amt(0.0f),
       pm_filterEnv_to_pwA_amt(0.0f),
       pm_filterEnv_to_filterCutoff_amt(0.0f),
-      pm_oscB_to_freqA_amt(0.0f),
       pm_oscB_to_pwA_amt(0.0f),
       pm_oscB_to_filterCutoff_amt(0.0f),
-      currentOutputFreq(0.0f), // This will store the glided, unbent frequency
+      currentOutputFreq(0.0f), 
       targetKeyFreq(0.0f),
       glideStartFreqForCurrentSegment(0.0f),
       glideLogStep(0.0f),
@@ -46,6 +51,7 @@ Voice::Voice(int sampleRate_, int numHarmonics)
       , ringModLevel_(0.0f)
       , panning_(0.0f)
 { 
+    // Default filter type is LPF24, set by VCF constructor
 }
 
 void Voice::noteOn(float freq, float velocity, int midiNoteNum, bool globalGlideEnabled, float globalGlideTimeSeconds) {
@@ -55,22 +61,23 @@ void Voice::noteOn(float freq, float velocity, int midiNoteNum, bool globalGlide
 
 
 void Voice::noteOnDetailed(float newTargetFrequency, float normVelocity, int midiNoteNum, bool useGlide, float glideTimeSec) {
-    this->targetKeyFreq = newTargetFrequency; // This is the unbent frequency of the MIDI key
+    this->targetKeyFreq = newTargetFrequency; 
     this->velocityValue = normVelocity; 
     this->noteNumber = midiNoteNum; 
     this->active = true;
+    this->lastS1OutputForFM_ = 0.0f; 
 
     if (vcoBKeyFollowEnabled_ || vcoBFixedBaseFreq_ < 0.0f) {
-        vcoBFixedBaseFreq_ = this->targetKeyFreq; // Store unbent frequency
+        vcoBFixedBaseFreq_ = this->targetKeyFreq; 
     }
 
     osc1.noteOn();
-    osc1.resetPhase(); // Reset phase for potential SuperSaw consistency
+    osc1.resetPhase(); 
     osc2.noteOn();
-    osc2.resetPhase(); // Reset phase for potential SuperSaw consistency
+    osc2.resetPhase(); 
     envelopes[0].noteOn(); 
     envelopes[1].noteOn(); 
-    filter.setNote(noteNumber); 
+    filter.setNote(noteNumber); // VCF needs note for keyfollow
 
     float freqToGlideFrom = this->currentOutputFreq; 
 
@@ -99,7 +106,7 @@ void Voice::noteOnDetailed(float newTargetFrequency, float normVelocity, int mid
         this->glideSamplesElapsed = 0;
 
     } else { 
-        this->currentOutputFreq = this->targetKeyFreq; // Start at target, unbent
+        this->currentOutputFreq = this->targetKeyFreq; 
         this->isGliding = false;
     }
     this->firstNoteForThisVoiceInstance = false;
@@ -116,16 +123,17 @@ float Voice::process(const LfoModulationValues& lfoMod, float currentPitchBendVa
     if (isGliding) {
         glideSamplesElapsed++;
         if (glideSamplesElapsed >= glideTimeSamples) {
-            currentOutputFreq = targetKeyFreq; // Target is unbent
+            currentOutputFreq = targetKeyFreq; 
             isGliding = false;
         } else {
             currentOutputFreq = glideStartFreqForCurrentSegment * std::exp(glideLogStep * static_cast<float>(glideSamplesElapsed));
         }
-    } else if (active) { // Ensure currentOutputFreq is up-to-date if not gliding but active
+    } else if (active) { 
         currentOutputFreq = targetKeyFreq;
     }
     
     if (!active && !envelopes[0].isActive() && !envelopes[1].isActive()) {
+        lastS1OutputForFM_ = 0.0f; 
         return 0.0f;
     }
     
@@ -150,82 +158,70 @@ float Voice::process(const LfoModulationValues& lfoMod, float currentPitchBendVa
     osc2.setPWMSource(lfoMod.osc2PwMod);
     osc2.setWheelModPWValue(lfoMod.wheelOsc2PwOffset); 
     
-    // --- VCO B (osc2) Frequency Calculation ---
-    float osc2_final_fundamental_freq;
+    float baseFreqVCOA_unbent_glided = this->currentOutputFreq;
+    float driftedBaseFreqVCOA = baseFreqVCOA_unbent_glided * std::pow(2.0f, osc1_pitch_drift_cents / 1200.0f);
+    float totalPitchModSemitonesVCOA = lfoMod.osc1FreqMod + (currentPitchBendValue * pitchBendRangeInSemitones);
+    float freqAfterStdModsVCOA = driftedBaseFreqVCOA * std::pow(2.0f, totalPitchModSemitonesVCOA / 12.0f);
+    float pm_env_to_freqA_hz_offset = ((filterEnvOutput - 0.5f) * 2.0f) * pm_filterEnv_to_freqA_amt * (baseFreqVCOA_unbent_glided * 2.0f); 
+    float baseFreqOsc1BeforeFM = freqAfterStdModsVCOA + pm_env_to_freqA_hz_offset;
+
+    float baseFreqOsc2BeforeFM;
     if (vcoBLowFreqEnabled) {
         const float minLfoRate = 0.05f;
         const float maxLfoRate = 20.0f;
-        float osc2_lfo_base_rate;
-        if (minLfoRate > 0.0f && maxLfoRate > minLfoRate) {
-             osc2_lfo_base_rate = minLfoRate * std::pow(maxLfoRate / minLfoRate, vcoBFreqKnob);
-        } else {
-             osc2_lfo_base_rate = minLfoRate + vcoBFreqKnob * (maxLfoRate - minLfoRate);
-        }
-        // lfoMod.osc2FreqMod contains LFO+Wheel for VCO2 Freq. Global pitch bend does not apply to LFO rate.
-        osc2_final_fundamental_freq = osc2_lfo_base_rate * std::pow(2.0f, lfoMod.osc2FreqMod / 12.0f);
-    } else { // Audio rate for VCO B
+        float osc2_lfo_base_rate = minLfoRate * std::pow(maxLfoRate / minLfoRate, vcoBFreqKnob); 
+        baseFreqOsc2BeforeFM = osc2_lfo_base_rate * std::pow(2.0f, lfoMod.osc2FreqMod / 12.0f); 
+    } else {
         float baseFreqVCOB_unbent = (vcoBKeyFollowEnabled_ ? this->currentOutputFreq 
                                                             : ((vcoBFixedBaseFreq_ < 0.0f) ? 261.63f : vcoBFixedBaseFreq_));
-        
         float driftedBaseFreqVCOB = baseFreqVCOB_unbent * std::pow(2.0f, osc2_pitch_drift_cents / 1200.0f);
-        
         float totalPitchModSemitonesVCOB = lfoMod.osc2FreqMod + (currentPitchBendValue * pitchBendRangeInSemitones);
-        float freqAfterPitchModsVCOB = driftedBaseFreqVCOB * std::pow(2.0f, totalPitchModSemitonesVCOB / 12.0f);
-        
-        float semitone_offset_from_knob = (vcoBFreqKnob - 0.5f) * 2.0f * 30.0f;
-        float freqAfterKnobVCOB = freqAfterPitchModsVCOB * std::pow(2.0f, semitone_offset_from_knob / 12.0f);
-        
-        osc2_final_fundamental_freq = freqAfterKnobVCOB * std::pow(2.0f, vcoBDetuneCents / 1200.0f);
+        float freqAfterStdModsVCOB = driftedBaseFreqVCOB * std::pow(2.0f, totalPitchModSemitonesVCOB / 12.0f);
+        float semitone_offset_from_knob = (vcoBFreqKnob - 0.5f) * 2.0f * 30.0f; 
+        float freqAfterKnobVCOB = freqAfterStdModsVCOB * std::pow(2.0f, semitone_offset_from_knob / 12.0f);
+        baseFreqOsc2BeforeFM = freqAfterKnobVCOB * std::pow(2.0f, vcoBDetuneCents / 1200.0f);
     }
-    osc2.setFrequency(std::max(0.0f, osc2_final_fundamental_freq));
+
+    float osc2_final_freq = baseFreqOsc2BeforeFM;
+    if (std::abs(xmodOsc1ToOsc2FMAmount_) > 0.001f) { 
+        osc2_final_freq = baseFreqOsc2BeforeFM * std::pow(2.0f, lastS1OutputForFM_ * xmodOsc1ToOsc2FMAmount_ * FM_OCTAVE_RANGE);
+    }
+    osc2.setFrequency(std::max(0.0f, osc2_final_freq));
     osc2.setDriftPWValue(osc2_pw_drift_offset); 
     float s2_output = osc2.process(); 
-    
-    // --- VCO A (osc1) PW PolyMod ---
-    float filterEnv_pwm_mod_scaled = (filterEnvOutput - 0.5f) * 2.0f; // Bipolar envelope
-    float vco1_pm_env_pw_effect = filterEnv_pwm_mod_scaled * pm_filterEnv_to_pwA_amt * 0.5f;
-    float vco1_pm_oscB_pw_effect = s2_output * pm_oscB_to_pwA_amt * 0.5f;
-    osc1.setPolyModPWValue(vco1_pm_env_pw_effect + vco1_pm_oscB_pw_effect); 
 
-    if (syncEnabled && s2_output > 0.0f && lastOsc2 <= 0.0f) {
+    float osc1_final_freq = baseFreqOsc1BeforeFM;
+    if (std::abs(xmodOsc2ToOsc1FMAmount_) > 0.001f) { 
+        osc1_final_freq = baseFreqOsc1BeforeFM * std::pow(2.0f, s2_output * xmodOsc2ToOsc1FMAmount_ * FM_OCTAVE_RANGE);
+    }
+    float filterEnv_pwm_mod_scaled = (filterEnvOutput - 0.5f) * 2.0f; 
+    float vco1_pm_env_pw_effect = filterEnv_pwm_mod_scaled * pm_filterEnv_to_pwA_amt * 0.5f;
+    float vco1_pm_oscB_pw_effect = s2_output * pm_oscB_to_pwA_amt * 0.5f; 
+    osc1.setPolyModPWValue(vco1_pm_env_pw_effect + vco1_pm_oscB_pw_effect); 
+    
+    osc1.setFrequency(std::max(0.0f, osc1_final_freq)); 
+    osc1.setDriftPWValue(osc1_pw_drift_offset); 
+
+    if (syncEnabled && s2_output > 0.0f && lastOsc2 <= 0.0f) { 
         osc1.sync();
     }
     lastOsc2 = s2_output;
 
-    // --- VCO A (osc1) Frequency Calculation ---
-    float baseFreqVCOA_unbent_glided = this->currentOutputFreq; // Glided, unbent frequency
-    
-    float driftedBaseFreqVCOA = baseFreqVCOA_unbent_glided * std::pow(2.0f, osc1_pitch_drift_cents / 1200.0f);
-    
-    float totalPitchModSemitonesVCOA = lfoMod.osc1FreqMod + (currentPitchBendValue * pitchBendRangeInSemitones);
-    float freqAfterPitchModsVCOA = driftedBaseFreqVCOA * std::pow(2.0f, totalPitchModSemitonesVCOA / 12.0f);
-    
-    // PolyMod Freq offsets are scaled by the unbent, glided base frequency for consistency
-    float pm_env_to_freqA_hz_offset = ((filterEnvOutput - 0.5f) * 2.0f) * pm_filterEnv_to_freqA_amt * (baseFreqVCOA_unbent_glided * 2.0f);
-    float pm_oscB_to_freqA_hz_offset = s2_output * pm_oscB_to_freqA_amt * (baseFreqVCOA_unbent_glided * 5.0f);
-    
-    float finalOsc1Freq = freqAfterPitchModsVCOA + pm_env_to_freqA_hz_offset + pm_oscB_to_freqA_hz_offset;
-    osc1.setFrequency(std::max(0.0f, finalOsc1Freq)); 
-    osc1.setDriftPWValue(osc1_pw_drift_offset); 
-
     float s1_output = osc1.process();
+    lastS1OutputForFM_ = s1_output; 
 
-    // --- Mixer & Filter ---
     float noise = distribution(generator);
     float ringModOutput = s1_output * s2_output * ringModLevel_;
     float mixed = (osc1Level * s1_output + osc2Level * s2_output + noiseLevel * noise + ringModOutput);
 
-
-    float vcfLfoModOffset = lfoMod.vcfCutoffMod; // Already includes LFO + Wheel for VCF in Hz
-    // PolyMod to Filter Cutoff (Hz offsets)
+    float vcfLfoModOffset = lfoMod.vcfCutoffMod; 
     float pm_env_to_vcf_hz_offset = ((filterEnvOutput - 0.5f) * 2.0f) * pm_filterEnv_to_filterCutoff_amt * 2000.0f;
-    float pm_oscB_to_vcf_hz_offset = s2_output * pm_oscB_to_filterCutoff_amt * 2000.0f;
+    float pm_oscB_to_vcf_hz_offset = s2_output * pm_oscB_to_filterCutoff_amt * 2000.0f; 
     
     filter.setEnvelopeValue(filterEnvOutput); 
     float directVcfModHz = vcfLfoModOffset + pm_env_to_vcf_hz_offset + pm_oscB_to_vcf_hz_offset;
     float filtered = filter.process(mixed, directVcfModHz);
 
-    // --- Amplitude Envelope & Velocity ---
     float amp_velocity_scaler = (1.0f - ampVelocitySensitivity) + (velocityValue * ampVelocitySensitivity);
     float ampEnvOutput = ampEnvOutput_raw * amp_velocity_scaler;
     float finalOutput = filtered * ampEnvOutput;
@@ -274,10 +270,18 @@ void Voice::setVCOBFreqKnob(float knobValue) {
 
 void Voice::setVCOBKeyFollowEnabled(bool enabled) {
     vcoBKeyFollowEnabled_ = enabled;
-    if (enabled && active) { // If re-enabled while a note is held, update fixed base immediately
+    if (enabled && active) { 
         vcoBFixedBaseFreq_ = this->targetKeyFreq;
     }
 }
+
+void Voice::setXModOsc2ToOsc1FMAmount(float amount) {
+    xmodOsc2ToOsc1FMAmount_ = std::clamp(amount, -1.0f, 1.0f);
+}
+void Voice::setXModOsc1ToOsc2FMAmount(float amount) {
+    xmodOsc1ToOsc2FMAmount_ = std::clamp(amount, -1.0f, 1.0f);
+}
+
 
 void Voice::setPMFilterEnvToFreqAAmount(float amount) {
     pm_filterEnv_to_freqA_amt = std::clamp(amount, 0.0f, 1.0f);
@@ -288,14 +292,16 @@ void Voice::setPMFilterEnvToPWAAmount(float amount) {
 void Voice::setPMFilterEnvToFilterCutoffAmount(float amount) {
     pm_filterEnv_to_filterCutoff_amt = std::clamp(amount, 0.0f, 1.0f);
 }
-void Voice::setPMOscBToFreqAAmount(float amount) {
-    pm_oscB_to_freqA_amt = std::clamp(amount, 0.0f, 1.0f);
-}
 void Voice::setPMOscBToPWAAmount(float amount) {
     pm_oscB_to_pwA_amt = std::clamp(amount, 0.0f, 1.0f);
 }
 void Voice::setPMOscBToFilterCutoffAmount(float amount) {
     pm_oscB_to_filterCutoff_amt = std::clamp(amount, 0.0f, 1.0f);
+}
+
+// Filter methods
+void Voice::setFilterType(SynthParams::FilterType type) {
+    filter.setType(type);
 }
 void Voice::setVCFResonance(float q)         { filter.setResonance(q); }
 void Voice::setVCFKeyFollow(float f)         { filter.setKeyFollow(f); }

@@ -1,44 +1,49 @@
 #pragma once
 
-// このファイルは、C APIからもインクルードされることを想定し、
-// C++特有の機能に依存しないように注意するか、#ifdef __cplusplus で囲む。
-// ここではシンプルにするため、C++のenum classを使用し、
-// C API側では通常のenumにマッピングすることを想定します。
-
 namespace SynthParams {
+
+// New: FilterType enum
+enum class FilterType {
+    LPF24, // Ladder Low Pass 24dB/oct (existing)
+    LPF12, // SVF Low Pass 12dB/oct
+    HPF12, // SVF High Pass 12dB/oct
+    BPF12, // SVF Band Pass 12dB/oct
+    NOTCH  // SVF Notch (Band Reject)
+};
 
 enum class ParamID {
     // Global Voice Parameters
     MasterTuneCents,
-    Waveform, // For both OSCs
+    Waveform, 
     Osc1Level,
     Osc2Level,
     NoiseLevel,
-    RingModLevel, // New
+    RingModLevel, 
     VCOBDetuneCents,
     SyncEnabled,
     VCOBLowFreqEnabled,
     VCOBFreqKnob,
     FilterEnvVelocitySensitivity,
     AmpVelocitySensitivity,
-    PulseWidth, // Base PW for both OSCs
-    PWMDepth,   // General PWM depth for both OSCs
+    PulseWidth, 
+    PWMDepth,   
 
-    // PolyMod Parameters
+    XModOsc2ToOsc1FMAmount,
+    XModOsc1ToOsc2FMAmount,
+
     PMFilterEnvToFreqAAmount,
     PMFilterEnvToPWAAmount,
     PMFilterEnvToFilterCutoffAmount,
-    PMOscBToFreqAAmount,
     PMOscBToPWAAmount,
     PMOscBToFilterCutoffAmount,
 
     // Filter Parameters
+    FilterType, // New: To select filter type
     VCFBaseCutoff,
     VCFResonance,
     VCFKeyFollow,
     VCFEnvelopeAmount,
 
-    // Envelope Parameters (Attack, Decay, Sustain, Release per envelope)
     AmpEnvAttack,
     AmpEnvDecay,
     AmpEnvSustain,
@@ -48,7 +53,6 @@ enum class ParamID {
     FilterEnvSustain,
     FilterEnvRelease,
 
-    // LFO Parameters
     LfoRate,
     LfoWaveform,
     LfoAmountToVco1Freq,
@@ -57,8 +61,7 @@ enum class ParamID {
     LfoAmountToVco2Pw,
     LfoAmountToVcfCutoff,
 
-    // Wheel Modulation Settings
-    ModulationWheelValue, // This is an input, but can be represented
+    ModulationWheelValue, 
     WheelModSource,
     WheelModAmountToFreqA,
     WheelModAmountToFreqB,
@@ -66,20 +69,16 @@ enum class ParamID {
     WheelModAmountToPWB,
     WheelModAmountToFilter,
 
-    // Unison Settings
     UnisonEnabled,
     UnisonDetuneCents,
-    UnisonStereoSpread, // New
+    UnisonStereoSpread, 
 
-    // Glide/Portamento Settings
     GlideEnabled,
     GlideTime,
 
-    // Analog Drift
     AnalogPitchDriftDepth,
     AnalogPWDriftDepth,
 
-    // Effects (Example: Reverb - assuming one main reverb instance)
     ReverbEnabled,
     ReverbDryWetMix,
     ReverbRoomSize,
@@ -87,31 +86,17 @@ enum class ParamID {
     ReverbWetGain,
     ReverbRT60,
 
-    // --- Add more parameters as needed ---
-    NumParameters // Keep last for counting if necessary
+    NumParameters 
 };
 
-// パラメータの型に関する情報や範囲などもここに定義できると便利
-// struct ParameterInfo {
-//     ParamID id;
-//     const char* name;
-//     enum class Type { Float, Int, Bool, Enum } type;
-//     float minValue, maxValue, defaultValue;
-//     // std::vector<const char*> enumNames; // for Enum type
-// };
-// extern const std::vector<ParameterInfo> PARAMETER_INFO_LIST;
 
-
-// C API 用のプレーンな enum (例)
-// C API を作る際に、上記 ParamID とマッピングする
-// C_ParamIDはSynthParams名前空間の外にある方が良いかもしれないが、今回はこのまま
 enum C_ParamID {
     C_PARAM_MASTER_TUNE_CENTS = 0,
     C_PARAM_WAVEFORM,
     C_PARAM_OSC1_LEVEL,
     C_PARAM_OSC2_LEVEL,
     C_PARAM_NOISE_LEVEL,
-    C_PARAM_RING_MOD_LEVEL, // New
+    C_PARAM_RING_MOD_LEVEL, 
     C_PARAM_VCOB_DETUNE_CENTS,
     C_PARAM_SYNC_ENABLED,
     C_PARAM_VCOB_LOW_FREQ_ENABLED,
@@ -121,13 +106,17 @@ enum C_ParamID {
     C_PARAM_PULSE_WIDTH,
     C_PARAM_PWM_DEPTH,
 
+    C_PARAM_XMOD_OSC2_TO_OSC1_FM_AMOUNT,
+    C_PARAM_XMOD_OSC1_TO_OSC2_FM_AMOUNT,
+
     C_PARAM_PM_FILTER_ENV_TO_FREQ_A_AMOUNT,
     C_PARAM_PM_FILTER_ENV_TO_PW_A_AMOUNT,
     C_PARAM_PM_FILTER_ENV_TO_FILTER_CUTOFF_AMOUNT,
-    C_PARAM_PM_OSCB_TO_FREQ_A_AMOUNT,
     C_PARAM_PM_OSCB_TO_PW_A_AMOUNT,
     C_PARAM_PM_OSCB_TO_FILTER_CUTOFF_AMOUNT,
 
+    // Filter Parameters
+    C_PARAM_FILTER_TYPE, // New
     C_PARAM_VCF_BASE_CUTOFF,
     C_PARAM_VCF_RESONANCE,
     C_PARAM_VCF_KEY_FOLLOW,
@@ -160,7 +149,7 @@ enum C_ParamID {
 
     C_PARAM_UNISON_ENABLED,
     C_PARAM_UNISON_DETUNE_CENTS,
-    C_PARAM_UNISON_STEREO_SPREAD, // New
+    C_PARAM_UNISON_STEREO_SPREAD, 
 
     C_PARAM_GLIDE_ENABLED,
     C_PARAM_GLIDE_TIME,
@@ -177,6 +166,15 @@ enum C_ParamID {
     
     C_PARAM_NUM_PARAMETERS
 };
+
+// C API用 FilterType enum
+typedef enum {
+    PS_FILTER_TYPE_LPF24 = 0,
+    PS_FILTER_TYPE_LPF12,
+    PS_FILTER_TYPE_HPF12,
+    PS_FILTER_TYPE_BPF12,
+    PS_FILTER_TYPE_NOTCH
+} PS_FilterType;
 
 
 } // namespace SynthParams

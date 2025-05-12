@@ -1,20 +1,45 @@
 // synth/vcf.cpp
 #include "vcf.h"
 #include <cmath>
-#include <algorithm> // For std::clamp
+#include <algorithm> 
 
 VCF::VCF(float sr)
-    : sampleRate(sr), baseCutoffHz(1000.0f), resonance(0.0f), keyFollow(0.0f),
-      envModAmount(0.0f), envelopeValue(0.0f), noteBaseFreq(440.0f) {
-    std::fill(std::begin(z), std::end(z), 0.0f);
+    : sampleRate(sr), currentFilterType_(SynthParams::FilterType::LPF24), 
+      baseCutoffHz(1000.0f), resonance(0.0f), keyFollow(0.0f),
+      envModAmount(0.0f), envelopeValue(0.0f), noteBaseFreq(440.0f),
+      s1_svf_(0.0f), s2_svf_(0.0f), svf_f_(0.1f), svf_q_coeff_(0.5f),
+      currentEffectiveCutoffHz_(1000.0f) {
+    std::fill(std::begin(z_ladder_), std::end(z_ladder_), 0.0f);
+    calculateCoefficients(baseCutoffHz, resonance); // Initial calculation
+}
+
+void VCF::setType(SynthParams::FilterType type) {
+    if (currentFilterType_ != type) {
+        currentFilterType_ = type;
+        // Reset filter states when type changes to avoid instability/artifacts
+        std::fill(std::begin(z_ladder_), std::end(z_ladder_), 0.0f);
+        s1_svf_ = 0.0f;
+        s2_svf_ = 0.0f;
+        // Recalculate coefficients for the new type with current settings
+        calculateCoefficients(currentEffectiveCutoffHz_, resonance); 
+    }
+}
+
+SynthParams::FilterType VCF::getType() const {
+    return currentFilterType_;
 }
 
 void VCF::setBaseCutoff(float hz) {
-    baseCutoffHz = std::clamp(hz, 20.0f, 20000.0f);
+    baseCutoffHz = std::clamp(hz, 20.0f, sampleRate * 0.49f); // Clamp to prevent aliasing issues
+    // No direct recalculation here, process() will do it based on effective cutoff
 }
 
-void VCF::setResonance(float q) {
-    resonance = std::clamp(q, 0.0f, 0.98f); // Slightly less than 1 to prevent extreme self-oscillation instability in this model
+void VCF::setResonance(float r) {
+    // User resonance 0-1. Internally, SVF Q needs to be mapped carefully.
+    // For ladder, resonance 0-0.98 was used.
+    // Let's keep resonance 0-1 for user, and map it.
+    resonance = std::clamp(r, 0.0f, 1.0f);
+    // No direct recalculation here
 }
 
 void VCF::setKeyFollow(float factor) {
@@ -26,63 +51,116 @@ void VCF::setEnvelopeMod(float amount) {
 }
 
 void VCF::setNote(int midiNote) {
-    // Reference for key follow is typically A4=440Hz (MIDI note 69)
-    // Or C4=261.63Hz (MIDI note 60) depending on convention
-    // Using A4=69
     noteBaseFreq = 440.0f * std::pow(2.0f, (static_cast<float>(midiNote) - 69.0f) / 12.0f);
 }
 
 void VCF::setEnvelopeValue(float env) {
-    envelopeValue = std::clamp(env, 0.0f, 1.0f); // Envelope output is usually 0-1
+    envelopeValue = std::clamp(env, 0.0f, 1.0f); 
 }
 
+void VCF::calculateCoefficients(float cutoffHz, float resonanceValue) {
+    // SVF Coefficients
+    // cutoffHz is the final modulated cutoff
+    // resonanceValue is user 0-1
+    
+    // Using tan pre-warping for SVF 'f' coefficient for better Nyquist behavior
+    float f_temp = static_cast<float>(std::tan(M_PI * cutoffHz / sampleRate));
+    svf_f_ = std::clamp(f_temp, 0.0001f, 1.0f); // Clamp f to avoid issues at extremes
+
+    // Map user resonance (0-1) to SVF Q factor.
+    // Q = 0.5 (no resonance) to high values (e.g., 20-50 for strong resonance)
+    // svf_q_coeff_ is typically 1.0 / (2.0 * Q) or similar for Chamberlin.
+    // So, high resonance = low svf_q_coeff_
+    // Let's map resonance [0, 1] to Q [0.5, 25]. So svf_q_coeff_ [1.0, 0.02]
+    float min_q_svf = 0.5f; // Minimum Q (no resonance)
+    float max_q_svf = 25.0f; // Maximum Q (high resonance, adjust for self-oscillation behavior)
+    float q_factor = min_q_svf + resonanceValue * (max_q_svf - min_q_svf);
+    
+    svf_q_coeff_ = 1.0f / (2.0f * q_factor);
+    svf_q_coeff_ = std::clamp(svf_q_coeff_, 0.01f, 1.0f); // Clamp to prevent instability (1/ (2*0.5) = 1, 1/(2*50) = 0.01)
+
+    // Ladder filter coefficients are calculated inside its process block for now due to 'f' calculation method
+}
+
+
 float VCF::process(float input, float directModHz) {
-    // 1. Calculate cutoff based on base, key follow, envelope mod, and direct LFO/PolyMod
+    // 1. Calculate effective cutoff frequency
     float effectiveCutoff = baseCutoffHz;
-
-    // Apply key follow: 1.0 = 100% key follow (cutoff moves with note pitch)
-    // Relative to a reference, e.g. A4 (440Hz) or Middle C. Assume reference for baseCutoff is A4.
-    // If noteBaseFreq is higher than ref, cutoff increases. If lower, cutoff decreases.
-    // A common reference for keytracking might be that at note 69 (A4), keytrack has no effect if baseCutoff is set for A4.
-    // Or, simpler: keyfollow directly scales the note frequency relationship.
-    // This formula means if keyFollow = 1, cutoff doubles per octave.
     effectiveCutoff *= std::pow(2.0f, keyFollow * (std::log2(noteBaseFreq / 440.0f)) );
-
-
-    // Apply envelope modulation
-    // Envelope value is 0 to 1. Bipolar envModAmount.
-    // A common behavior: envMod scales how many octaves the envelope sweeps.
-    // E.g. envMod = 1.0, envValue = 1.0 -> sweep up X octaves. envMod = -1.0 -> sweep down.
-    // Let's say envMod of 1.0 means full envelope (1.0) sweeps cutoff by 5 octaves (example)
-    float envSweepOctaves = 5.0f;
-    effectiveCutoff *= std::pow(2.0f, envModAmount * (envelopeValue - 0.5f) * 2.0f * envSweepOctaves); // Centered around 0.5 for bipolar feel
-
-
-    // Apply direct modulation (LFO, PolyMod)
+    float envSweepOctaves = 5.0f; 
+    effectiveCutoff *= std::pow(2.0f, envModAmount * (envelopeValue - 0.5f) * 2.0f * envSweepOctaves); 
     effectiveCutoff += directModHz;
+    currentEffectiveCutoffHz_ = std::clamp(effectiveCutoff, 20.0f, sampleRate * 0.49f);
 
-    effectiveCutoff = std::clamp(effectiveCutoff, 20.0f, sampleRate * 0.49f); // Clamp to avoid issues
+    // 2. Recalculate filter coefficients based on new effective cutoff and resonance
+    calculateCoefficients(currentEffectiveCutoffHz_, resonance);
 
-    // Filter algorithm (4-pole ladder filter approximation)
-    // Calculation of 'f' (normalized cutoff frequency for the filter algorithm)
-    float f = 2.0f * std::sinf(M_PI * effectiveCutoff / sampleRate);
-    f = std::clamp(f, 0.0f, 1.0f); // Ensure f is in a safe range for stability
+    // 3. Process based on filter type
+    float output = 0.0f;
 
-    // Feedback amount 'fb' based on resonance.
-    // Resonance here is 0 to ~1. Higher q gives more resonance.
-    // Max fb needs to be < 4.0 for stability in this simple model.
-    float fb = resonance * (4.0f * 0.95f); // Max resonance just under instability point. Adjust 0.95f as needed.
-    fb = std::clamp(fb, 0.0f, 3.95f);
+    switch (currentFilterType_) {
+        case SynthParams::FilterType::LPF24: {
+            // Ladder Filter (existing algorithm)
+            float f_ladder = 2.0f * std::sinf(static_cast<float>(M_PI) * currentEffectiveCutoffHz_ / sampleRate);
+            f_ladder = std::clamp(f_ladder, 0.0f, 1.0f); 
+            float fb_ladder = resonance * 3.95f; // Map resonance 0-1 to 0-3.95
+            fb_ladder = std::clamp(fb_ladder, 0.0f, 3.95f);
+
+            float lowPass = input - z_ladder_[3] * fb_ladder; 
+            lowPass = std::clamp(lowPass, -10.0f, 10.0f); 
+
+            z_ladder_[0] = z_ladder_[0] + f_ladder * (lowPass - z_ladder_[0]);
+            z_ladder_[1] = z_ladder_[1] + f_ladder * (z_ladder_[0] - z_ladder_[1]);
+            z_ladder_[2] = z_ladder_[2] + f_ladder * (z_ladder_[1] - z_ladder_[2]);
+            z_ladder_[3] = z_ladder_[3] + f_ladder * (z_ladder_[2] - z_ladder_[3]);
+            output = z_ladder_[3];
+            break;
+        }
+        
+        case SynthParams::FilterType::LPF12:
+        case SynthParams::FilterType::HPF12:
+        case SynthParams::FilterType::BPF12:
+        case SynthParams::FilterType::NOTCH: {
+            // State Variable Filter (Chamberlin)
+            // Input with soft clipping to prevent blow-ups with high resonance
+            float svf_input = std::tanh(input);
+
+            // Chamberlin SVF calculation (integrators s1_svf, s2_svf)
+            // v0 = input - s2 (or input - feedback_path)
+            // For this form, resonance is controlled by damping on the BP feedback to LP input
+            // A common Chamberlin form:
+            float v0 = svf_input; // Input to the filter
+            float v_lp = s2_svf_; // Lowpass output from previous sample
+            float v_bp = s1_svf_; // Bandpass output from previous sample
+
+            // Note: svf_q_coeff_ is like 1/(2Q). Smaller value means higher Q.
+            float v_hp = v0 - v_lp - svf_q_coeff_ * v_bp; // Highpass output
+
+            float v_bp_new = svf_f_ * v_hp + v_bp;      // New bandpass state component
+            float v_lp_new = svf_f_ * v_bp_new + v_lp;    // New lowpass state component
+
+            s1_svf_ = v_bp_new; // Update bandpass state (integrator 1)
+            s2_svf_ = v_lp_new; // Update lowpass state (integrator 2)
+            
+            // Denormal protection (very small random numbers if state becomes zero)
+            // This is a common trick if filter states get stuck at pure zero.
+            // Not always necessary with float precision but can help.
+            // const float denormal_offset = 1e-20f;
+            // if (std::abs(s1_svf_) < denormal_offset) s1_svf_ += (rand() % 2 ? denormal_offset : -denormal_offset);
+            // if (std::abs(s2_svf_) < denormal_offset) s2_svf_ += (rand() % 2 ? denormal_offset : -denormal_offset);
 
 
-    // Filter processing stages
-    float lowPass = input - z[3] * fb; // Input with feedback
-    lowPass = std::clamp(lowPass, -10.0f, 10.0f); // Prevent extreme values from blowing up filter
-
-    z[0] = z[0] + f * (lowPass - z[0]);
-    z[1] = z[1] + f * (z[0] - z[1]);
-    z[2] = z[2] + f * (z[1] - z[2]);
-    z[3] = z[3] + f * (z[2] - z[3]);
-
-    return z[3]; // Output of the 4th pole
+            if (currentFilterType_ == SynthParams::FilterType::LPF12) {
+                output = s2_svf_; // Lowpass output
+            } else if (currentFilterType_ == SynthParams::FilterType::HPF12) {
+                output = v_hp; // Highpass output
+            } else if (currentFilterType_ == SynthParams::FilterType::BPF12) {
+                output = s1_svf_; // Bandpass output
+            } else if (currentFilterType_ == SynthParams::FilterType::NOTCH) {
+                output = v_hp + s2_svf_; // Notch = HP + LP
+            }
+            break;
+        }
+    }
+    return output;
 }

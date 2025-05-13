@@ -88,3 +88,5 @@ The synthesizer executable is run from the `synth` directory.
 
 ```bash
 ./synth [path_to_params.json] [path_to_song.mid] [midi_input_port_number]
+
+exsample: ./synth synth_params.json test_song.mid

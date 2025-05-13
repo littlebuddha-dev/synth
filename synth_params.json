@@ -1,0 +1,83 @@
+{
+    "masterTuneCents": 0.0,
+    "waveform": "Saw",
+    "osc1Level": 0.7,
+    "osc2Level": 0.5,
+    "noiseLevel": 0.05,
+    "ringModLevel": 0.0,
+    "vcoBDetuneCents": 5.0,
+    "syncEnabled": false,
+    "pulseWidth": 0.5,
+    "pwmDepth": 0.0,
+    "vcoBLowFreqEnabled": false,
+    "vcoBFreqKnob": 0.5,
+    "vcoBKeyFollowEnabled": true,
+    "filterEnvVelocitySensitivity": 0.4,
+    "ampVelocitySensitivity": 0.9,
+
+    "xmodOsc2ToOsc1FMAmount": 0.0,
+    "xmodOsc1ToOsc2FMAmount": 0.0,
+
+    "pmFilterEnvToFreqAAmount": 0.0,
+    "pmFilterEnvToPWAAmount": 0.0,
+    "pmFilterEnvToFilterCutoffAmount": 0.1,
+    "pmOscBToPWAAmount": 0.0,
+    "pmOscBToFilterCutoffAmount": 0.0,
+
+    "filterType": "LPF24",
+    "vcfBaseCutoff": 2500.0,
+    "vcfResonance": 0.25,
+    "vcfKeyFollow": 0.2,
+    "vcfEnvelopeAmount": 0.7,
+
+    "mixerDrive": 0.1,
+    "mixerPostGain": 0.8,
+
+    "ampEnv": {
+        "attack": 0.05,
+        "decay": 0.3,
+        "sustain": 0.8,
+        "release": 0.4
+    },
+    "filterEnv": {
+        "attack": 0.1,
+        "decay": 0.2,
+        "sustain": 0.5,
+        "release": 0.5
+    },
+
+    "lfoRate": 6.0,
+    "lfoWaveform": "Sine",
+    "lfoAmountToVco1Freq": 0.0,
+    "lfoAmountToVco2Freq": 0.0,
+    "lfoAmountToVco1Pw": 0.0,
+    "lfoAmountToVco2Pw": 0.0,
+    "lfoAmountToVcfCutoff": 0.0,
+
+    "wheelModSource": "LFO",
+    "wheelModAmountToFilter": 0.5,
+
+    "unisonEnabled": false,
+    "unisonDetuneCents": 7.0,
+    "unisonStereoSpread": 0.7,
+
+    "glideEnabled": false,
+    "glideTime": 0.05,
+
+    "analogPitchDriftDepth": 0.2,
+    "analogPWDriftDepth": 0.0,
+
+    "pitchBendRangeSemitones": 2.0,
+
+    "osc1Harmonics": [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    "osc2Harmonics": [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+
+    "reverb": {
+        "enabled": true,
+        "dryWetMix": 0.25,
+        "roomSize": 0.6,
+        "damping": 0.5,
+        "wetGain": 1.0,
+        "rt60": 1.5
+    }
+}

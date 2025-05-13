@@ -108,7 +108,8 @@ public:
 
   void setMixerDrive(float drive);
   void setMixerPostGain(float gain);
-
+  int getSampleRate() const { return sampleRate; }
+  
 private:
   std::vector<Voice> voices;
   int sampleRate;

@@ -65,13 +65,13 @@ The Midifile and nlohmann/json libraries are included in this repository.
 
 1.  Clone the repository:
     ```bash
-    git clone <your_repository_url>
-    cd <repository_directory_name>/synth
+    git  clone https://github.com/littlebuddha-dev/synth.git
+    cd synth
     ```
     If you cloned a version that uses Git submodules for Midifile, you would need:
     ```bash
-    git clone --recurse-submodules <your_repository_url>
-    cd <repository_directory_name>/synth
+    git clone --recurse-submodules <repository_url>
+    cd synth
     ```
 
 2.  Compile the project using Make:

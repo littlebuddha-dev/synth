@@ -186,8 +186,11 @@ void ps_set_int_param(PolySynthHandle handle, SynthParams::C_ParamID param_id_c,
     SynthParams::ParamID param_id_cpp = map_c_param_id_to_cpp(param_id_c);
 
     switch (param_id_cpp) {
-        case SynthParams::ParamID::Waveform:       
-            synth->setWaveform(map_ps_waveform_to_cpp(static_cast<PS_Waveform>(value))); 
+        case SynthParams::ParamID::Osc1Waveform:
+            synth->setOsc1Waveform(map_ps_waveform_to_cpp(static_cast<PS_Waveform>(value)));
+            break;
+        case SynthParams::ParamID::Osc2Waveform:
+            synth->setOsc2Waveform(map_ps_waveform_to_cpp(static_cast<PS_Waveform>(value)));
             break;
         case SynthParams::ParamID::SyncEnabled:        
             synth->setSyncEnabled(static_cast<bool>(value)); 
@@ -223,9 +226,14 @@ void ps_set_int_param(PolySynthHandle handle, SynthParams::C_ParamID param_id_c,
 }
 
 
-void ps_set_waveform_c(PolySynthHandle handle, PS_Waveform wf_c) {
+void ps_set_osc1_waveform_c(PolySynthHandle handle, PS_Waveform wf_c) {
     if (!handle) return;
-    static_cast<PolySynth*>(handle)->setWaveform(map_ps_waveform_to_cpp(wf_c));
+    static_cast<PolySynth*>(handle)->setOsc1Waveform(map_ps_waveform_to_cpp(wf_c));
+}
+
+void ps_set_osc2_waveform_c(PolySynthHandle handle, PS_Waveform wf_c) {
+    if (!handle) return;
+    static_cast<PolySynth*>(handle)->setOsc2Waveform(map_ps_waveform_to_cpp(wf_c));
 }
 
 void ps_set_osc1_level(PolySynthHandle handle, float level) {

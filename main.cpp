@@ -63,7 +63,8 @@ void resetWheelModAmounts(PolySynth &s) {
 // --- Default Sound Configuration ---
 void loadDefaultStringsSound(PolySynth& s, ReverbEffect* reverb) {
     std::cout << "Loading default strings sound..." << std::endl;
-    s.setWaveform(Waveform::Saw);
+    s.setOsc1Waveform(Waveform::Saw);
+    s.setOsc2Waveform(Waveform::Saw);
     s.setOsc1Level(0.6f);
     s.setOsc2Level(0.4f);
     s.setVCOBDetuneCents(7.0f);
@@ -219,7 +220,18 @@ void loadParametersFromJson(PolySynth& s, ReverbEffect* reverb, const std::strin
 
     // Synth-wide parameters
     s.setMasterTuneCents(get_json_value_safe(j, "masterTuneCents", 0.0f));
-    if (j.contains("waveform")) s.setWaveform(stringToWaveform(j.at("waveform").get<std::string>()));
+    if (j.contains("osc1Waveform")) {
+        s.setOsc1Waveform(stringToWaveform(j.at("osc1Waveform").get<std::string>()));
+    } else if (j.contains("waveform")) { // Fallback for old "waveform" key for OSC1
+        std::cout << "Warning: 'waveform' key is deprecated for osc1, use 'osc1Waveform'. Using 'waveform' for OSC1." << std::endl;
+        s.setOsc1Waveform(stringToWaveform(j.at("waveform").get<std::string>()));
+    }
+    if (j.contains("osc2Waveform")) {
+        s.setOsc2Waveform(stringToWaveform(j.at("osc2Waveform").get<std::string>()));
+    } else if (j.contains("waveform")) { // Fallback for old "waveform" key for OSC2
+         std::cout << "Warning: 'waveform' key is deprecated for osc2, use 'osc2Waveform'. Using 'waveform' for OSC2." << std::endl;
+        s.setOsc2Waveform(stringToWaveform(j.at("waveform").get<std::string>()));
+    }
     s.setOsc1Level(get_json_value_safe(j, "osc1Level", 1.0f));
     s.setOsc2Level(get_json_value_safe(j, "osc2Level", 0.0f));
     s.setNoiseLevel(get_json_value_safe(j, "noiseLevel", 0.0f));

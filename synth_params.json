@@ -1,83 +1,82 @@
 {
     "masterTuneCents": 0.0,
-    "waveform": "Saw",
-    "osc1Level": 0.7,
-    "osc2Level": 0.5,
-    "noiseLevel": 0.05,
-    "ringModLevel": 0.0,
-    "vcoBDetuneCents": 5.0,
+    "osc1Waveform": "Square",
+    "osc2Waveform": "Saw",
+    "osc1Level": 0.8,
+    "osc2Level": 0.6,
+    "noiseLevel": 0.02,
+    "ringModLevel": 0.5,
+    "vcoBDetuneCents": 7.0,
     "syncEnabled": false,
     "pulseWidth": 0.5,
-    "pwmDepth": 0.0,
+    "pwmDepth": 0.2,
     "vcoBLowFreqEnabled": false,
     "vcoBFreqKnob": 0.5,
     "vcoBKeyFollowEnabled": true,
-    "filterEnvVelocitySensitivity": 0.4,
-    "ampVelocitySensitivity": 0.9,
-
-    "xmodOsc2ToOsc1FMAmount": 0.0,
-    "xmodOsc1ToOsc2FMAmount": 0.0,
-
+    "filterEnvVelocitySensitivity": 0.5,
+    "ampVelocitySensitivity": 0.8,
+    "xmodOsc2ToOsc1FMAmount": 0.3,
+    "xmodOsc1ToOsc2FMAmount": 0.7,
     "pmFilterEnvToFreqAAmount": 0.0,
     "pmFilterEnvToPWAAmount": 0.0,
     "pmFilterEnvToFilterCutoffAmount": 0.1,
     "pmOscBToPWAAmount": 0.0,
     "pmOscBToFilterCutoffAmount": 0.0,
-
     "filterType": "LPF24",
-    "vcfBaseCutoff": 2500.0,
-    "vcfResonance": 0.25,
+    "vcfBaseCutoff": 4000.0,
+    "vcfResonance": 0.3,
     "vcfKeyFollow": 0.2,
-    "vcfEnvelopeAmount": 0.7,
-
-    "mixerDrive": 0.1,
-    "mixerPostGain": 0.8,
-
+    "vcfEnvelopeAmount": 0.6,
+    "mixerDrive": 0.05,
+    "mixerPostGain": 0.9,
     "ampEnv": {
-        "attack": 0.05,
-        "decay": 0.3,
-        "sustain": 0.8,
-        "release": 0.4
-    },
-    "filterEnv": {
-        "attack": 0.1,
-        "decay": 0.2,
-        "sustain": 0.5,
+        "attack": 0.02,
+        "decay": 0.4,
+        "sustain": 0.7,
         "release": 0.5
     },
-
-    "lfoRate": 6.0,
+    "filterEnv": {
+        "attack": 0.05,
+        "decay": 0.3,
+        "sustain": 0.4,
+        "release": 0.6
+    },
+    "lfoRate": 5.0,
     "lfoWaveform": "Sine",
-    "lfoAmountToVco1Freq": 0.0,
-    "lfoAmountToVco2Freq": 0.0,
-    "lfoAmountToVco1Pw": 0.0,
-    "lfoAmountToVco2Pw": 0.0,
-    "lfoAmountToVcfCutoff": 0.0,
-
+    "lfoAmountToVco1Freq": 0.1,
+    "lfoAmountToVco2Freq": 0.1,
+    "lfoAmountToVco1Pw": 0.15,
+    "lfoAmountToVco2Pw": 0.15,
+    "lfoAmountToVcfCutoff": 200.0,
+    "modulationWheelValue": 0.0,
     "wheelModSource": "LFO",
-    "wheelModAmountToFilter": 0.5,
-
+    "wheelModAmountToFreqA": 0.2,
+    "wheelModAmountToFreqB": 0.2,
+    "wheelModAmountToPWA": 0.3,
+    "wheelModAmountToPWB": 0.3,
+    "wheelModAmountToFilter": 0.4,
     "unisonEnabled": false,
-    "unisonDetuneCents": 7.0,
-    "unisonStereoSpread": 0.7,
-
+    "unisonDetuneCents": 10.0,
+    "unisonStereoSpread": 0.75,
     "glideEnabled": false,
-    "glideTime": 0.05,
-
-    "analogPitchDriftDepth": 0.2,
-    "analogPWDriftDepth": 0.0,
-
+    "glideTime": 0.08,
+    "analogPitchDriftDepth": 0.1,
+    "analogPWDriftDepth": 0.05,
     "pitchBendRangeSemitones": 2.0,
-
-    "osc1Harmonics": [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-    "osc2Harmonics": [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-
+    "osc1Harmonics": [
+        1.0, 0.0, 0.5, 0.0, 0.25, 0.0, 0.125, 0.0,
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+    ],
+    "osc2Harmonics": [
+        1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+    ],
     "reverb": {
         "enabled": true,
-        "dryWetMix": 0.25,
-        "roomSize": 0.6,
-        "damping": 0.5,
+        "dryWetMix": 0.3,
+        "roomSize": 0.7,
+        "damping": 0.4,
         "wetGain": 1.0,
-        "rt60": 1.5
+        "rt60": 1.8
     }
 }

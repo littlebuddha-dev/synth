@@ -12,7 +12,8 @@ enum class FilterType {
 
 enum class ParamID {
     MasterTuneCents,
-    Waveform, 
+    Osc1Waveform,
+    Osc2Waveform,
     Osc1Level,
     Osc2Level,
     NoiseLevel,
@@ -94,6 +95,8 @@ enum class ParamID {
 enum C_ParamID {
     C_PARAM_MASTER_TUNE_CENTS = 0,
     C_PARAM_WAVEFORM,
+    C_PARAM_OSC1_WAVEFORM,
+    C_PARAM_OSC2_WAVEFORM,
     C_PARAM_OSC1_LEVEL,
     C_PARAM_OSC2_LEVEL,
     C_PARAM_NOISE_LEVEL,

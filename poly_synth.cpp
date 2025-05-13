@@ -253,9 +253,13 @@ Voice *PolySynth::findVoiceForNote(int midiNote) {
   return nullptr;
 }
 
-void PolySynth::setWaveform(Waveform wf) {
+void PolySynth::setOsc1Waveform(Waveform wf) {
   for (auto &voice : voices)
-    voice.setWaveform(wf);
+    voice.setOsc1Waveform(wf);
+}
+void PolySynth::setOsc2Waveform(Waveform wf) {
+  for (auto &voice : voices)
+    voice.setOsc2Waveform(wf);
 }
 void PolySynth::setNoiseLevel(float level) {
   for (auto &voice : voices)

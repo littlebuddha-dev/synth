@@ -35,7 +35,8 @@ public:
   void noteOff(int midiNote);
   StereoSample process(); 
 
-  void setWaveform(Waveform wf); 
+  void setOsc1Waveform(Waveform wf);
+  void setOsc2Waveform(Waveform wf);
   void setOsc1Level(float);
   void setOsc2Level(float);
   void setNoiseLevel(float level);      

@@ -106,7 +106,8 @@ bool isGateOpen() const { return active; }
 bool areEnvelopesActive() const { return envelopes[0].isActive() || envelopes[1].isActive(); }
 
 
-void setWaveform(Waveform wf);
+void setOsc1Waveform(Waveform wf);
+void setOsc2Waveform(Waveform wf);
 
 void setOsc1Level(float level);
 void setOsc2Level(float level);

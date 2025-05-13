@@ -244,8 +244,11 @@ bool Voice::isActive() const {
     return active || envelopes[0].isActive() || envelopes[1].isActive();
 }
 
-void Voice::setWaveform(Waveform wf) {
+void Voice::setOsc1Waveform(Waveform wf) {
     osc1.setWaveform(wf);
+}
+
+void Voice::setOsc2Waveform(Waveform wf) {
     osc2.setWaveform(wf);
 }
 

@@ -65,12 +65,12 @@ The Midifile and nlohmann/json libraries are included in this repository.
 
 1.  Clone the repository:
     ```bash
-    git  clone https://github.com/littlebuddha-dev/synth.git
+    git clone https://github.com/littlebuddha-dev/synth.git
     cd synth
     ```
     If you cloned a version that uses Git submodules for Midifile, you would need:
     ```bash
-    git clone --recurse-submodules <repository_url>
+    git clone --recurse-submodules https://github.com/littlebuddha-dev/synth.git
     cd synth
     ```
 
@@ -88,3 +88,5 @@ The synthesizer executable is run from the `synth` directory.
 
 ```bash
 ./synth [path_to_params.json] [path_to_song.mid] [midi_input_port_number]
+
+exsample: ./synth synth_params.json test_song.mid

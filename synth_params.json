@@ -1,21 +1,21 @@
 {
     "masterTuneCents": 0.0,
     "osc1Waveform": "Sine",
-    "osc2Waveform": "Saw",
+    "osc2Waveform": "Triangle",
     "osc1Level": 0.7,
     "osc2Level": 0.5,
-    "noiseLevel": 0.02,
-    "ringModLevel": 0.0,
+    "noiseLevel": 0.08,
+    "ringModLevel": 0.5,
     "vcoBDetuneCents": 7.0,
     "syncEnabled": false,
-    "pulseWidth": 0.5,
-    "pwmDepth": 0.0
+    "pulseWidth": 0.2,
+    "pwmDepth": 0.3,
     "vcoBLowFreqEnabled": false,
     "vcoBFreqKnob": 0.5,
     "vcoBKeyFollowEnabled": true,
     "filterEnvVelocitySensitivity": 0.5,
     "ampVelocitySensitivity": 0.8,
-    "xmodOsc2ToOsc1FMAmount": 0.1,
+    "xmodOsc2ToOsc1FMAmount": 0.5,
     "xmodOsc1ToOsc2FMAmount": 0.2,
     "pmFilterEnvToFreqAAmount": 0.0,
     "pmFilterEnvToPWAAmount": 0.0,
@@ -23,7 +23,7 @@
     "pmOscBToPWAAmount": 0.0,
     "pmOscBToFilterCutoffAmount": 0.0,
     "filterType": "LPF24",
-    "vcfBaseCutoff": 1000.0,
+    "vcfBaseCutoff": 500.0,
     "vcfResonance": 0.6,
     "vcfKeyFollow": 0.4,
     "vcfEnvelopeAmount": 0.5,
@@ -32,8 +32,8 @@
     "ampEnv": {
         "attack": 0.002,
         "decay": 0.6,
-        "sustain": 0.0,
-        "release": 0.8
+        "sustain": 1.3,
+        "release": 1.8
     },
     "filterEnv": {
         "attack": 0.01,
@@ -44,10 +44,9 @@
     "lfoRate": 5.0,
     "lfoWaveform": "Sine",
     "lfoAmountToVco1Freq": 0.0,
-    "lfoAmountToVcfCutoff": 0.0,
     "lfoAmountToVco1Pw": 0.15,
     "lfoAmountToVco2Pw": 0.15,
-    "lfoAmountToVcfCutoff": 200.0,
+    "lfoAmountToVcfCutoff": 0.0,
     "modulationWheelValue": 0.0,
     "wheelModSource": "LFO",
     "wheelModAmountToFreqA": 0.2,
@@ -68,7 +67,7 @@
         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
     ],
     "osc2Harmonics": [
-        1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        1.0, 0.3, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
     ],
     "reverb": {
